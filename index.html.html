@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Message in a Bottle - Collaborative Learning</title>
+
+    <!-- Supabase Client Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- Three.js for 3D Ocean -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            margin: 20px 0;
+        }
+
+        h1 {
+            color: #667eea;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 50px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.3s;
+            width: 100%;
+            margin: 10px 0;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        input, textarea, select {
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 16px;
+        }
+
+        textarea {
+            min-height: 150px;
+            resize: vertical;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 500px;
+            border-radius: 15px;
+            overflow: hidden;
+            background: linear-gradient(180deg, #87CEEB 0%, #4682B4 100%);
+        }
+
+        .qr-display {
+            text-align: center;
+            padding: 30px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            margin: 20px 0;
+        }
+
+        .session-code {
+            font-size: 48px;
+            font-weight: bold;
+            color: #667eea;
+            letter-spacing: 10px;
+            margin: 20px 0;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .stat-box {
+            text-align: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            min-width: 150px;
+            margin: 10px;
+        }
+
+        .stat-number {
+            font-size: 36px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            border-left: 4px solid #c33;
+        }
+
+        .success-message {
+            background: #efe;
+            color: #3c3;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            border-left: 4px solid #3c3;
+        }
+
+        .emoji-picker {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 5px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            margin: 10px 0;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .emoji-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 5px;
+            transition: background 0.2s;
+        }
+
+        .emoji-btn:hover {
+            background: #ddd;
+        }
+
+        .word-counter {
+            text-align: right;
+            margin: 10px 0;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .word-counter.valid {
+            color: #4CAF50;
+        }
+
+        .word-counter.invalid {
+            color: #f44336;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.8em;
+            }
+
+            .session-code {
+                font-size: 32px;
+                letter-spacing: 5px;
+            }
+
+            .card {
+                padding: 20px;
+            }
+
+            #canvas-container {
+                height: 300px;
+            }
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="app">
+        <!-- Landing Page -->
+        <div id="landing-page">
+            <div class="card">
+                <h1>🍾 Message in a Bottle</h1>
+                <p style="text-align: center; color: #666; margin-bottom: 30px;">
+                    A gamified collaboration tool for students to share their thoughts
+                </p>
+                <button class="btn" onclick="router.navigate('teacher/dashboard')">
+                    👨‍🏫 I'm a Teacher
+                </button>
+                <button class="btn" onclick="router.navigate('student/join')">
+                    🎓 I'm a Student
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // SUPABASE CONFIGURATION
+        // ==========================================
+        // TODO: Replace with your Supabase URL and Key
+        const SUPABASE_URL = 'https://jqugywwoklzquynlpqxv.supabase.co/';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpxdWd5d3dva2x6cXV5bmxwcXh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE2NDEzMjIsImV4cCI6MjA3NzIxNzMyMn0.FwTyvSc4FyswoDtpaMBazKyhXc023yGlN4SUhOhOwTc';
+
+        // Initialize Supabase client
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // ==========================================
+        // GLOBAL STATE & UTILITIES
+        // ==========================================
+        const state = {
+            currentUser: 'user_' + Math.random().toString(36).substr(2, 9),
+            currentSession: null,
+            currentRole: null
+        };
+
+        // Generate session code
+        function generateSessionCode() {
+            return Math.random().toString(36).substring(2, 10).toUpperCase();
+        }
+
+        // Generate bottle color
+        function generateBottleColor() {
+            const hue = Math.floor(Math.random() * 360);
+            return `hsl(${hue}, 60%, 70%)`;
+        }
+
+        // Count words
+        function countWords(text) {
+            return text.trim().split(/\s+/).filter(word => word.length > 0).length;
+        }
+
+        // Simple router
+        const router = {
+            routes: {},
+            currentRoute: null,
+
+            register(path, component) {
+                this.routes[path] = component;
+            },
+
+            navigate(path, params = {}) {
+                window.location.hash = path;
+                this.currentRoute = path;
+                const component = this.routes[path];
+                if (component) {
+                    document.getElementById('app').innerHTML = component(params);
+                    // Execute any onMount hooks
+                    if (this.onMount) this.onMount();
+                }
+            },
+
+            onMount: null
+        };
+
+        // ==========================================
+        // TEACHER COMPONENTS
+        // ==========================================
+
+        // Teacher Dashboard
+        router.register('teacher/dashboard', (params) => {
+            return `
+                <div class="card">
+                    <h1>👨‍🏫 Teacher Dashboard</h1>
+                    <button class="btn" onclick="router.navigate('teacher/create')">
+                        ➕ Create New Session
+                    </button>
+                    <button class="btn" onclick="router.navigate('')" style="background: #999;">
+                        ← Back to Home
+                    </button>
+                </div>
+            `;
+        });
+
+        // Teacher Create Session
+        router.register('teacher/create', (params) => {
+            return `
+                <div class="card">
+                    <h1>Create New Session</h1>
+
+                    <div>
+                        <label>
+                            <input type="radio" name="mode" value="free" checked onchange="toggleQuestionFields()">
+                            Free Mind Mode (Students write anything)
+                        </label>
+                    </div>
+                    <div>
+                        <label>
+                            <input type="radio" name="mode" value="question" onchange="toggleQuestionFields()">
+                            A/B Question Mode
+                        </label>
+                    </div>
+
+                    <div id="question-fields" class="hidden" style="margin-top: 20px;">
+                        <input type="text" id="question-text" placeholder="Enter your question (e.g., What learning style do you prefer?)">
+                        <input type="text" id="option-a" placeholder="Option A (e.g., Visual Learning)">
+                        <input type="text" id="option-b" placeholder="Option B (e.g., Auditory Learning)">
+                    </div>
+
+                    <div style="margin-top: 20px;">
+                        <label>Timeout (minutes):</label>
+                        <input type="number" id="timeout" min="1" max="10" value="2">
+                    </div>
+
+                    <button class="btn" onclick="createSession()">
+                        🚀 Launch Session
+                    </button>
+                    <button class="btn" onclick="router.navigate('teacher/dashboard')" style="background: #999;">
+                        ← Back
+                    </button>
+
+                    <div id="create-status"></div>
+                </div>
+            `;
+        });
+
+        function toggleQuestionFields() {
+            const mode = document.querySelector('input[name="mode"]:checked').value;
+            const fields = document.getElementById('question-fields');
+            if (mode === 'question') {
+                fields.classList.remove('hidden');
+            } else {
+                fields.classList.add('hidden');
+            }
+        }
+
+        async function createSession() {
+            const mode = document.querySelector('input[name="mode"]:checked').value;
+            const timeout = parseInt(document.getElementById('timeout').value);
+            const sessionId = generateSessionCode();
+
+            let sessionData = {
+                id: sessionId,
+                mode: mode,
+                timeout_minutes: timeout,
+                is_active: true,
+                participant_count: 0
+            };
+
+            if (mode === 'question') {
+                const question = document.getElementById('question-text').value;
+                const optionA = document.getElementById('option-a').value;
+                const optionB = document.getElementById('option-b').value;
+
+                if (!question || !optionA || !optionB) {
+                    alert('Please fill in all question fields!');
+                    return;
+                }
+
+                sessionData.question = question;
+                sessionData.option_a = optionA;
+                sessionData.option_b = optionB;
+            }
+
+            // Insert into Supabase
+            const { data, error } = await supabase
+                .from('sessions')
+                .insert([sessionData]);
+
+            if (error) {
+                document.getElementById('create-status').innerHTML = `
+                    <div class="error-message">Error creating session: ${error.message}</div>
+                `;
+                return;
+            }
+
+            state.currentSession = sessionId;
+            router.navigate('teacher/monitor', { sessionId });
+        }
+
+        // Teacher Monitor
+        router.register('teacher/monitor', (params) => {
+            const sessionId = params.sessionId || state.currentSession;
+
+            setTimeout(() => loadMonitorData(sessionId), 100);
+
+            return `
+                <div class="card">
+                    <h1>📊 Session Monitor</h1>
+
+                    <div class="qr-display">
+                        <h2>Session Code:</h2>
+                        <div class="session-code">${sessionId}</div>
+                        <p>Students can join by entering this code</p>
+                    </div>
+
+                    <div class="stats">
+                        <div class="stat-box">
+                            <div class="stat-number" id="participant-count">0</div>
+                            <div class="stat-label">Participants</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-number" id="message-count">0</div>
+                            <div class="stat-label">Messages</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-number" id="time-remaining">--:--</div>
+                            <div class="stat-label">Time Remaining</div>
+                        </div>
+                    </div>
+
+                    <div id="canvas-container"></div>
+
+                    <div style="margin-top: 20px;">
+                        <button class="btn" onclick="closeSession('${sessionId}')">
+                            🛑 Force Close Session
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+
+        async function loadMonitorData(sessionId) {
+            // Subscribe to realtime updates
+            const messagesChannel = supabase
+                .channel('messages-channel')
+                .on('postgres_changes', 
+                    { event: 'INSERT', schema: 'public', table: 'messages', filter: `session_id=eq.${sessionId}` },
+                    (payload) => {
+                        console.log('New message:', payload.new);
+                        updateMessageCount(sessionId);
+                        // TODO: Add bottle to 3D scene
+                    }
+                )
+                .subscribe();
+
+            const participantsChannel = supabase
+                .channel('participants-channel')
+                .on('postgres_changes',
+                    { event: 'INSERT', schema: 'public', table: 'participants', filter: `session_id=eq.${sessionId}` },
+                    (payload) => {
+                        console.log('New participant:', payload.new);
+                        updateParticipantCount(sessionId);
+                    }
+                )
+                .subscribe();
+
+            // Initial load
+            updateParticipantCount(sessionId);
+            updateMessageCount(sessionId);
+        }
+
+        async function updateParticipantCount(sessionId) {
+            const { data, error } = await supabase
+                .from('participants')
+                .select('*', { count: 'exact' })
+                .eq('session_id', sessionId);
+
+            if (!error && data) {
+                document.getElementById('participant-count').textContent = data.length;
+            }
+        }
+
+        async function updateMessageCount(sessionId) {
+            const { data, error } = await supabase
+                .from('messages')
+                .select('*', { count: 'exact' })
+                .eq('session_id', sessionId);
+
+            if (!error && data) {
+                document.getElementById('message-count').textContent = data.length;
+            }
+        }
+
+        async function closeSession(sessionId) {
+            const { data, error } = await supabase
+                .from('sessions')
+                .update({ is_active: false })
+                .eq('id', sessionId);
+
+            if (!error) {
+                alert('Session closed successfully!');
+                router.navigate('teacher/dashboard');
+            }
+        }
+
+        // ==========================================
+        // STUDENT COMPONENTS
+        // ==========================================
+
+        // Student Join
+        router.register('student/join', (params) => {
+            return `
+                <div class="card">
+                    <h1>🎓 Join Session</h1>
+                    <input type="text" id="join-code" placeholder="Enter 8-character session code" 
+                           maxlength="8" style="text-transform: uppercase;">
+                    <button class="btn" onclick="joinSession()">
+                        🚪 Join Session
+                    </button>
+                    <button class="btn" onclick="router.navigate('')" style="background: #999;">
+                        ← Back to Home
+                    </button>
+                    <div id="join-status"></div>
+                </div>
+            `;
+        });
+
+        async function joinSession() {
+            const code = document.getElementById('join-code').value.toUpperCase().trim();
+
+            if (code.length !== 8) {
+                document.getElementById('join-status').innerHTML = `
+                    <div class="error-message">Please enter a valid 8-character code</div>
+                `;
+                return;
+            }
+
+            // Check if session exists and is active
+            const { data: session, error } = await supabase
+                .from('sessions')
+                .select('*')
+                .eq('id', code)
+                .single();
+
+            if (error || !session) {
+                document.getElementById('join-status').innerHTML = `
+                    <div class="error-message">Session not found. Please check the code.</div>
+                `;
+                return;
+            }
+
+            if (!session.is_active) {
+                document.getElementById('join-status').innerHTML = `
+                    <div class="error-message">This session has ended.</div>
+                `;
+                return;
+            }
+
+            if (session.participant_count >= 100) {
+                document.getElementById('join-status').innerHTML = `
+                    <div class="error-message">Session is full (100/100 participants)</div>
+                `;
+                return;
+            }
+
+            // Add participant
+            const { error: participantError } = await supabase
+                .from('participants')
+                .insert([{
+                    id: state.currentUser,
+                    session_id: code
+                }]);
+
+            if (participantError) {
+                console.error('Error joining session:', participantError);
+            }
+
+            state.currentSession = code;
+            router.navigate('student/compose', { session });
+        }
+
+        // Student Compose
+        router.register('student/compose', (params) => {
+            const session = params.session || {};
+            state.currentSession = session;
+
+            setTimeout(() => setupComposer(session), 100);
+
+            let questionHtml = '';
+            if (session.mode === 'question') {
+                questionHtml = `
+                    <div style="background: #f0f0f0; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+                        <h3>${session.question}</h3>
+                        <div style="margin-top: 15px;">
+                            <label style="display: block; margin: 10px 0;">
+                                <input type="radio" name="option" value="A" required>
+                                <strong>A:</strong> ${session.option_a}
+                            </label>
+                            <label style="display: block; margin: 10px 0;">
+                                <input type="radio" name="option" value="B" required>
+                                <strong>B:</strong> ${session.option_b}
+                            </label>
+                        </div>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="card">
+                    <h1>✍️ Write Your Message</h1>
+
+                    ${questionHtml}
+
+                    <input type="text" id="student-name" placeholder="Your name (optional)">
+                    <label>
+                        <input type="checkbox" id="anonymous-check">
+                        Submit anonymously
+                    </label>
+
+                    <textarea id="message-text" placeholder="Share your thoughts... (max 100 words)"></textarea>
+
+                    <div class="word-counter valid" id="word-counter">0 / 100 words</div>
+
+                    <button class="btn" id="emoji-toggle" onclick="toggleEmojis()">
+                        😊 Add Emoji
+                    </button>
+
+                    <div id="emoji-picker" class="hidden"></div>
+
+                    <button class="btn" id="submit-btn" onclick="submitMessage()">
+                        🍾 Throw Bottle
+                    </button>
+
+                    <div id="compose-status"></div>
+                </div>
+            `;
+        });
+
+        function setupComposer(session) {
+            const textarea = document.getElementById('message-text');
+            const counter = document.getElementById('word-counter');
+
+            textarea.addEventListener('input', () => {
+                const words = countWords(textarea.value);
+                counter.textContent = `${words} / 100 words`;
+
+                if (words > 100) {
+                    counter.classList.remove('valid');
+                    counter.classList.add('invalid');
+                    document.getElementById('submit-btn').disabled = true;
+                } else {
+                    counter.classList.remove('invalid');
+                    counter.classList.add('valid');
+                    document.getElementById('submit-btn').disabled = false;
+                }
+            });
+
+            // Setup emoji picker
+            const emojis = ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','🙃','😉','😊','😇','❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❣️','💕','👍','👎','👌','✌️','🤞','🤟','🤘','🤙','👏','🙌','👐','⭐','✨','💫','🌟','⚡','💥','💯','✅','❌','❓','❗','🎉','🎊','🎈','🎁','🏆'];
+
+            const picker = document.getElementById('emoji-picker');
+            picker.className = 'emoji-picker hidden';
+            emojis.forEach(emoji => {
+                const btn = document.createElement('button');
+                btn.className = 'emoji-btn';
+                btn.textContent = emoji;
+                btn.type = 'button';
+                btn.onclick = () => {
+                    textarea.value += emoji;
+                    textarea.focus();
+                };
+                picker.appendChild(btn);
+            });
+        }
+
+        function toggleEmojis() {
+            const picker = document.getElementById('emoji-picker');
+            picker.classList.toggle('hidden');
+        }
+
+        async function submitMessage() {
+            const session = state.currentSession;
+            const sessionId = session.id;
+            const messageText = document.getElementById('message-text').value.trim();
+
+            if (!messageText) {
+                alert('Please write a message!');
+                return;
+            }
+
+            const wordCount = countWords(messageText);
+            if (wordCount > 100) {
+                alert('Message exceeds 100 words!');
+                return;
+            }
+
+            let studentName = document.getElementById('student-name').value.trim();
+            const isAnonymous = document.getElementById('anonymous-check').checked;
+
+            if (isAnonymous) {
+                studentName = null;
+            }
+
+            let selectedOption = null;
+            if (session.mode === 'question') {
+                const optionEl = document.querySelector('input[name="option"]:checked');
+                if (!optionEl) {
+                    alert('Please select an option (A or B)!');
+                    return;
+                }
+                selectedOption = optionEl.value;
+            }
+
+            const messageData = {
+                id: 'msg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                session_id: sessionId,
+                participant_id: state.currentUser,
+                student_name: studentName,
+                is_anonymous: isAnonymous,
+                selected_option: selectedOption,
+                message_text: messageText,
+                word_count: wordCount,
+                bottle_color: generateBottleColor()
+            };
+
+            const { data, error } = await supabase
+                .from('messages')
+                .insert([messageData]);
+
+            if (error) {
+                document.getElementById('compose-status').innerHTML = `
+                    <div class="error-message">Error sending message: ${error.message}</div>
+                `;
+                return;
+            }
+
+            // Show success
+            document.getElementById('compose-status').innerHTML = `
+                <div class="success-message">
+                    🎉 Your message has been thrown into the ocean!
+                </div>
+            `;
+
+            // Disable form
+            document.getElementById('submit-btn').disabled = true;
+            document.getElementById('message-text').disabled = true;
+        }
+
+        // ==========================================
+        // INITIALIZE APP
+        // ==========================================
+        window.addEventListener('load', () => {
+            // Check if hash exists
+            const hash = window.location.hash.substring(1);
+            if (hash) {
+                router.navigate(hash);
+            }
+        });
+
+        // Handle back button
+        window.addEventListener('hashchange', () => {
+            const hash = window.location.hash.substring(1);
+            if (hash) {
+                router.navigate(hash);
+            }
+        });
+    </script>
+</body>
+</html>
