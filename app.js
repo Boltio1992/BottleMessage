@@ -7,12 +7,146 @@ const AppState = {
   socketId: null
 };
 
+// Session Manager - Global persistent storage
+const SessionManager = {
+  // Initialize global storage on first load
+  init: function() {
+    if (!window.globalSessions) {
+      window.globalSessions = {};
+      console.log('[SessionManager] Initialized global session storage');
+    }
+  },
+  
+  save: function(sessionId, sessionData) {
+    this.init();
+    
+    // Convert Set to Array for storage
+    const sessionToSave = { ...sessionData };
+    if (sessionData.participants instanceof Set) {
+      sessionToSave.participants = Array.from(sessionData.participants);
+    }
+    
+    // Save to global window object
+    window.globalSessions[sessionId] = sessionToSave;
+    
+    console.log('[SessionManager] Saved session:', sessionId, sessionToSave);
+    
+    // Update in-memory map
+    AppState.sessions.set(sessionId, sessionData);
+    
+    // Trigger custom event for reactivity
+    window.dispatchEvent(new CustomEvent('sessionsUpdated', { detail: window.globalSessions }));
+  },
+  
+  get: function(sessionId) {
+    this.init();
+    const session = window.globalSessions[sessionId];
+    
+    if (session) {
+      // Convert participants array back to Set
+      if (Array.isArray(session.participants)) {
+        session.participants = new Set(session.participants);
+      }
+      console.log('[SessionManager] Get session:', sessionId, 'FOUND');
+      return session;
+    }
+    
+    console.log('[SessionManager] Get session:', sessionId, 'NOT FOUND');
+    return null;
+  },
+  
+  getAll: function() {
+    this.init();
+    const sessions = window.globalSessions || {};
+    console.log('[SessionManager] Retrieved all sessions:', Object.keys(sessions));
+    return sessions;
+  },
+  
+  update: function(sessionId, updates) {
+    const session = this.get(sessionId);
+    if (session) {
+      Object.assign(session, updates);
+      this.save(sessionId, session);
+      console.log('[SessionManager] Updated session:', sessionId, updates);
+    }
+  },
+  
+  addMessage: function(sessionId, message) {
+    const session = this.get(sessionId);
+    if (session) {
+      session.messages = session.messages || [];
+      session.messages.push(message);
+      this.save(sessionId, session);
+      console.log('[SessionManager] Added message to session:', sessionId);
+      return true;
+    }
+    return false;
+  },
+  
+  addParticipant: function(sessionId, participantId) {
+    const session = this.get(sessionId);
+    if (session) {
+      session.participants = session.participants || new Set();
+      if (!(session.participants instanceof Set)) {
+        session.participants = new Set(session.participants);
+      }
+      if (!session.participants.has(participantId)) {
+        session.participants.add(participantId);
+        this.save(sessionId, session);
+        console.log('[SessionManager] Added participant to session:', sessionId, participantId);
+      }
+      return true;
+    }
+    return false;
+  },
+  
+  delete: function(sessionId) {
+    this.init();
+    delete window.globalSessions[sessionId];
+    AppState.sessions.delete(sessionId);
+    console.log('[SessionManager] Deleted session:', sessionId);
+  },
+  
+  // Debug helper
+  debugInfo: function() {
+    const sessions = this.getAll();
+    console.log('=== SESSION DEBUG INFO ===');
+    console.log('Total sessions:', Object.keys(sessions).length);
+    Object.keys(sessions).forEach(id => {
+      const s = sessions[id];
+      console.log(`Session ${id}:`, {
+        mode: s.mode,
+        active: s.isActive,
+        participants: Array.isArray(s.participants) ? s.participants.length : s.participants?.size || 0,
+        messages: s.messages?.length || 0
+      });
+    });
+    console.log('========================');
+  }
+};
+
+// Make globally accessible
+window.SessionManager = SessionManager;
+
 // Initialize
 function init() {
+  console.log('[App] Initializing...');
+  
+  // Initialize SessionManager first
+  SessionManager.init();
+  
   AppState.socketId = generateSocketId();
   loadState();
   setupRouter();
   startPolling();
+  
+  // Show debug info in console
+  SessionManager.debugInfo();
+  
+  // Add global debug helper
+  window.debugSessions = () => SessionManager.debugInfo();
+  
+  console.log('[App] Initialization complete. Socket ID:', AppState.socketId);
 }
 
 // State Persistence
@@ -31,12 +165,20 @@ function saveState() {
 
 function loadState() {
   try {
-    const data = window.appStateBackup;
-    if (data && data.sessions) {
-      AppState.sessions = new Map(data.sessions);
-      // Clean up expired sessions
-      cleanupSessions();
-    }
+    // Load from SessionManager (localStorage)
+    const sessions = SessionManager.getAll();
+    const sessionEntries = Object.entries(sessions).map(([id, session]) => {
+      // Convert participants array back to Set
+      if (Array.isArray(session.participants)) {
+        session.participants = new Set(session.participants);
+      }
+      return [id, session];
+    });
+    AppState.sessions = new Map(sessionEntries);
+    console.log('[App] Loaded sessions from storage:', AppState.sessions.size);
+    
+    // Clean up expired sessions
+    cleanupSessions();
   } catch (e) {
     console.warn('State load failed:', e);
   }
@@ -44,14 +186,22 @@ function loadState() {
 
 function cleanupSessions() {
   const now = Date.now();
-  const TWO_HOURS = 2 * 60 * 60 * 1000;
+  const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
   
-  for (const [id, session] of AppState.sessions.entries()) {
-    if (now - session.createdAt > TWO_HOURS && !session.isActive) {
-      AppState.sessions.delete(id);
+  const sessions = SessionManager.getAll();
+  let cleaned = 0;
+  
+  for (const [id, session] of Object.entries(sessions)) {
+    // Only remove sessions older than 24 hours that are not active
+    if (now - session.createdAt > TWENTY_FOUR_HOURS && !session.isActive) {
+      SessionManager.delete(id);
+      cleaned++;
     }
   }
-  saveState();
+  
+  if (cleaned > 0) {
+    console.log(`[App] Cleaned up ${cleaned} expired sessions`);
+  }
 }
 
 // Utility Functions
@@ -62,8 +212,13 @@ function generateSocketId() {
 function generateSessionCode() {
   let code;
   do {
-    code = Math.random().toString(36).substring(2, 10).toUpperCase();
-  } while (AppState.sessions.has(code));
+    // Generate exactly 8 character code
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    code = '';
+    for (let i = 0; i < 8; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+  } while (SessionManager.get(code));
   return code;
 }
 
@@ -99,6 +254,34 @@ function showToast(message, type = 'info') {
   }, 3000);
 }
 
+function copyToClipboard(text, successMessage = 'Copied to clipboard!') {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      showToast(successMessage, 'success');
+    }).catch(() => {
+      fallbackCopy(text, successMessage);
+    });
+  } else {
+    fallbackCopy(text, successMessage);
+  }
+}
+
+function fallbackCopy(text, successMessage) {
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  try {
+    document.execCommand('copy');
+    showToast(successMessage, 'success');
+  } catch (err) {
+    showToast('Could not copy to clipboard', 'error');
+  }
+  document.body.removeChild(textarea);
+}
+
 // Session Management
 function createSession(config) {
   const id = generateSessionCode();
@@ -116,20 +299,39 @@ function createSession(config) {
     autoCloseTimer: null
   };
   
-  AppState.sessions.set(id, session);
-  saveState();
+  // Save using SessionManager
+  SessionManager.save(id, session);
+  console.log('[App] Created session:', id);
+  
+  // Fire event
+  window.dispatchEvent(new CustomEvent('sessionCreated', { 
+    detail: { sessionId: id, sessionData: session } 
+  }));
+  
   return session;
 }
 
 function getSession(id) {
-  return AppState.sessions.get(id);
+  // Try SessionManager first (localStorage)
+  let session = SessionManager.get(id);
+  
+  // Update in-memory map
+  if (session) {
+    AppState.sessions.set(id, session);
+  }
+  
+  return session;
 }
 
 function addMessage(sessionId, message) {
   const session = getSession(sessionId);
-  if (!session) return false;
+  if (!session) {
+    console.error('[App] Cannot add message - session not found:', sessionId);
+    return false;
+  }
   
   if (session.messages.length >= 100) {
+    console.warn('[App] Cannot add message - session full');
     return false;
   }
   
@@ -147,11 +349,19 @@ function addMessage(sessionId, message) {
     bottleColor: generateBottleColor()
   };
   
-  session.messages.push(messageObj);
-  session.participants.add(AppState.socketId);
-  saveState();
-  emitEvent('messageAdded', { sessionId, message: messageObj });
-  return true;
+  // Use SessionManager
+  const success = SessionManager.addMessage(sessionId, messageObj);
+  if (success) {
+    SessionManager.addParticipant(sessionId, AppState.socketId);
+    emitEvent('messageAdded', { sessionId, message: messageObj });
+    
+    // Fire event
+    window.dispatchEvent(new CustomEvent('messageSubmitted', { 
+      detail: { sessionId, message: messageObj } 
+    }));
+  }
+  
+  return success;
 }
 
 function generateBottlePosition(index) {
@@ -171,7 +381,9 @@ function closeSession(sessionId) {
     if (session.autoCloseTimer) {
       clearTimeout(session.autoCloseTimer);
     }
-    saveState();
+    // Save using SessionManager
+    SessionManager.save(sessionId, session);
+    console.log('[App] Closed session:', sessionId);
     emitEvent('sessionClosed', { sessionId });
   }
 }
@@ -198,7 +410,12 @@ function startPolling() {
 function setupRouter() {
   function handleRoute() {
     const hash = window.location.hash || '#/';
-    const [path, ...params] = hash.substring(2).split('/');
+    const hashContent = hash.substring(2); // Remove '#/'
+    const parts = hashContent.split('/');
+    const path = parts[0] || '';
+    const params = parts.slice(1);
+    
+    console.log('[Router] Navigating to:', path, 'params:', params);
     
     switch (path) {
       case '':
@@ -209,24 +426,29 @@ function setupRouter() {
           renderTeacherDashboard();
         } else if (params[0] === 'create') {
           renderCreateSession();
-        } else if (params[0] === 'monitor') {
-          renderMonitor(params[1]);
-        } else if (params[0] === 'review') {
-          renderReview(params[1]);
+        } else if (params[0] === 'monitor' && params[1]) {
+          renderMonitor(params[1].toUpperCase());
+        } else if (params[0] === 'review' && params[1]) {
+          renderReview(params[1].toUpperCase());
+        } else {
+          renderTeacherDashboard();
         }
         break;
       case 'join':
         if (params[0]) {
-          renderStudentLanding(params[0]);
+          const sessionCode = params[0].trim().toUpperCase();
+          renderStudentLanding(sessionCode);
         } else {
           renderStudentJoin();
         }
         break;
       case 'student':
-        if (params[0] === 'compose') {
-          renderComposer(params[1]);
-        } else if (params[0] === 'submitted') {
-          renderSubmitted(params[1]);
+        if (params[0] === 'compose' && params[1]) {
+          renderComposer(params[1].toUpperCase());
+        } else if (params[0] === 'submitted' && params[1]) {
+          renderSubmitted(params[1].toUpperCase());
+        } else {
+          renderStudentJoin();
         }
         break;
       default:
@@ -240,6 +462,9 @@ function setupRouter() {
 
 // View Renderers
 function renderLanding() {
+  const allSessions = SessionManager.getAll();
+  const activeSessions = Object.values(allSessions).filter(s => s.isActive);
+  
   const app = document.getElementById('app');
   app.innerHTML = `
     <div class="landing">
@@ -249,13 +474,40 @@ function renderLanding() {
         <button class="btn btn-primary btn-large" onclick="location.hash='#/teacher/dashboard'">👨‍🏫 I'm a Teacher</button>
         <button class="btn btn-secondary btn-large" onclick="location.hash='#/join'">🎓 I'm a Student</button>
       </div>
+      
+      ${activeSessions.length > 0 ? `
+        <div style="margin-top: 48px; padding: 24px; background: rgba(255,255,255,0.8); border-radius: 12px; max-width: 600px;">
+          <h3 style="margin-bottom: 16px; color: var(--primary);">📡 Active Sessions (${activeSessions.length})</h3>
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            ${activeSessions.map(s => {
+              const pCount = s.participants instanceof Set ? s.participants.size : (Array.isArray(s.participants) ? s.participants.length : 0);
+              return `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: white; border-radius: 8px; border: 2px solid var(--primary);">
+                  <div>
+                    <strong style="font-family: monospace; font-size: 18px;">${s.id}</strong>
+                    <span style="margin-left: 12px; opacity: 0.7;">${s.mode === 'free' ? '✍️ Free' : '❓ Question'}</span>
+                  </div>
+                  <div style="font-size: 14px; opacity: 0.8;">
+                    👥 ${pCount} | 💬 ${s.messages.length}
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+          <button class="btn btn-secondary" onclick="SessionManager.debugInfo()" style="margin-top: 16px; width: 100%;">🔍 Show Debug Info in Console</button>
+        </div>
+      ` : ''}
     </div>
   `;
 }
 
 function renderTeacherDashboard() {
-  const sessions = Array.from(AppState.sessions.values());
+  // Load from SessionManager
+  const allSessions = SessionManager.getAll();
+  const sessions = Object.values(allSessions);
   const activeSessions = sessions.filter(s => s.isActive);
+  
+  console.log('[Teacher] Dashboard - Total sessions:', sessions.length, 'Active:', activeSessions.length);
   
   const app = document.getElementById('app');
   app.innerHTML = `
@@ -271,7 +523,9 @@ function renderTeacherDashboard() {
             <h3>Create New Session</h3>
           </div>
         </div>
-        ${activeSessions.map(session => `
+        ${activeSessions.map(session => {
+          const participantCount = session.participants instanceof Set ? session.participants.size : (Array.isArray(session.participants) ? session.participants.length : 0);
+          return `
           <div class="card session-card" onclick="location.hash='#/teacher/monitor/${session.id}'">
             <div class="session-info">
               <h3>${session.mode === 'free' ? '✍️ Free Mind' : '❓ A/B Question'}</h3>
@@ -279,11 +533,11 @@ function renderTeacherDashboard() {
             </div>
             <div class="session-code">${session.id}</div>
             <div class="session-info">
-              <p>👥 ${session.participants.size} participants</p>
+              <p>👥 ${participantCount} participants</p>
               <p>💬 ${session.messages.length} messages</p>
             </div>
           </div>
-        `).join('')}
+        `}).join('')}
       </div>
     </div>
   `;
@@ -360,9 +614,9 @@ function handleCreateSession(event) {
   };
   
   if (mode === 'question') {
-    config.question = document.getElementById('question').value;
-    config.optionA = document.getElementById('optionA').value;
-    config.optionB = document.getElementById('optionB').value;
+    config.question = document.getElementById('question').value.trim();
+    config.optionA = document.getElementById('optionA').value.trim();
+    config.optionB = document.getElementById('optionB').value.trim();
     
     if (!config.question || !config.optionA || !config.optionB) {
       showToast('Please fill in all question fields', 'error');
@@ -370,9 +624,15 @@ function handleCreateSession(event) {
     }
   }
   
+  console.log('[Teacher] Creating session with config:', config);
   const session = createSession(config);
-  showToast('Session created successfully!', 'success');
-  location.hash = `#/teacher/monitor/${session.id}`;
+  console.log('[Teacher] Session created:', session.id);
+  showToast(`Session created! Code: ${session.id}`, 'success');
+  
+  // Small delay to ensure session is saved
+  setTimeout(() => {
+    location.hash = `#/teacher/monitor/${session.id}`;
+  }, 100);
 }
 
 function renderMonitor(sessionId) {
@@ -383,8 +643,12 @@ function renderMonitor(sessionId) {
     return;
   }
   
+  const participantCount = session.participants instanceof Set ? session.participants.size : (Array.isArray(session.participants) ? session.participants.length : 0);
+  
   const app = document.getElementById('app');
   const joinUrl = `${window.location.origin}${window.location.pathname}#/join/${sessionId}`;
+  
+  console.log('[Teacher] Monitoring session:', sessionId, 'Participants:', participantCount);
   
   app.innerHTML = `
     <div class="header">
@@ -395,14 +659,18 @@ function renderMonitor(sessionId) {
         <div>
           <div class="qr-container">
             <h3 style="margin-bottom: 16px;">Scan to Join</h3>
+            <p style="font-size: 14px; opacity: 0.7; margin-bottom: 12px;">or share the code below</p>
             <div id="qr-code"></div>
-            <div class="session-code">${session.id}</div>
+            <div class="session-code" style="cursor: pointer;" onclick="copyToClipboard('${session.id}', 'Session code copied!')" title="Click to copy">
+              ${session.id}
+            </div>
+            <p style="text-align: center; font-size: 14px; opacity: 0.7; margin-top: -8px;">📋 Click code to copy</p>
           </div>
         </div>
         <div class="monitor-info">
           <div class="info-item">
             <div class="info-label">Participants</div>
-            <div class="info-value" id="participant-count">${session.participants.size}/100</div>
+            <div class="info-value" id="participant-count">${participantCount}/100</div>
           </div>
           <div class="info-item">
             <div class="info-label">Messages</div>
@@ -448,7 +716,8 @@ function renderMonitor(sessionId) {
   const updateListener = () => {
     const currentSession = getSession(sessionId);
     if (currentSession) {
-      document.getElementById('participant-count').textContent = `${currentSession.participants.size}/100`;
+      const participantCount = currentSession.participants instanceof Set ? currentSession.participants.size : (Array.isArray(currentSession.participants) ? currentSession.participants.length : 0);
+      document.getElementById('participant-count').textContent = `${participantCount}/100`;
       document.getElementById('message-count').textContent = `${currentSession.messages.length}/100`;
       
       // Update ocean scene
@@ -507,10 +776,15 @@ function handleAutoClose(sessionId) {
 }
 
 function renderReview(sessionId) {
+  console.log('[Teacher] Rendering review for session:', sessionId);
+  
   const session = getSession(sessionId);
   if (!session) {
+    console.error('[Teacher] Session not found:', sessionId);
     showToast('Session not found', 'error');
-    location.hash = '#/teacher/dashboard';
+    setTimeout(() => {
+      location.hash = '#/teacher/dashboard';
+    }, 2000);
     return;
   }
   
@@ -616,7 +890,9 @@ function markAsRead(sessionId, messageId) {
     const message = session.messages.find(m => m.id === messageId);
     if (message) {
       message.isRead = true;
-      saveState();
+      // Save using SessionManager
+      SessionManager.save(sessionId, session);
+      console.log('[App] Marked message as read:', messageId);
       
       // Remove modal
       document.querySelector('.modal-overlay')?.remove();
@@ -665,6 +941,9 @@ function exportMessages(sessionId) {
 
 // Student Views
 function renderStudentJoin() {
+  const allSessions = SessionManager.getAll();
+  const activeSessions = Object.values(allSessions).filter(s => s.isActive);
+  
   const app = document.getElementById('app');
   app.innerHTML = `
     <div class="header">
@@ -673,49 +952,110 @@ function renderStudentJoin() {
     <div class="container student-join">
       <div class="card">
         <h2 style="text-align: center; margin-bottom: 24px;">Enter Session Code</h2>
+        <p style="text-align: center; opacity: 0.7; margin-bottom: 24px;">8-character code (e.g., ABC12345)</p>
         <form onsubmit="handleJoinSession(event)">
           <div class="form-group">
-            <input type="text" class="form-control code-input" id="session-code" placeholder="ABC12345" maxlength="8" required>
+            <input type="text" class="form-control code-input" id="session-code" placeholder="ABC12345" maxlength="8" required autocomplete="off">
+            <p style="text-align: center; font-size: 14px; margin-top: 8px; opacity: 0.6;">
+              💡 Available sessions: ${activeSessions.length}
+            </p>
           </div>
           <button type="submit" class="btn btn-primary btn-full btn-large">Join Session</button>
         </form>
       </div>
     </div>
   `;
+  
+  // Auto-uppercase as user types
+  setTimeout(() => {
+    const input = document.getElementById('session-code');
+    if (input) {
+      input.addEventListener('input', (e) => {
+        e.target.value = e.target.value.toUpperCase();
+      });
+    }
+  }, 100);
 }
 
 function handleJoinSession(event) {
   event.preventDefault();
-  const code = document.getElementById('session-code').value.toUpperCase();
+  const codeInput = document.getElementById('session-code');
+  const code = codeInput.value.trim().toUpperCase();
+  
+  if (!code) {
+    showToast('Please enter a session code', 'error');
+    return;
+  }
+  
+  console.log('[Student] Attempting to join session:', code);
+  
+  // Check if session exists before navigating
+  const session = SessionManager.get(code);
+  console.log('[Student] Session lookup result:', session ? 'FOUND' : 'NOT FOUND');
+  
+  if (!session) {
+    showToast(`Session "${code}" not found. Please check the code and try again.`, 'error');
+    SessionManager.debugInfo();
+    return;
+  }
+  
   location.hash = `#/join/${code}`;
 }
 
 function renderStudentLanding(sessionId) {
+  console.log('[Student] Rendering landing for session:', sessionId);
+  
   const session = getSession(sessionId);
+  console.log('[Student] Session found:', !!session);
+  
   if (!session) {
-    showToast('Session not found', 'error');
-    location.hash = '#/join';
+    console.error('[Student] Session not found:', sessionId);
+    const allSessions = SessionManager.getAll();
+    console.log('[Student] Available sessions:', Object.keys(allSessions));
+    showToast(`Session "${sessionId}" not found. Please check the code or ask your teacher.`, 'error');
+    setTimeout(() => {
+      location.hash = '#/join';
+    }, 2000);
     return;
   }
   
   if (!session.isActive) {
+    console.warn('[Student] Session is not active:', sessionId);
     showToast('This session has ended', 'warning');
-    location.hash = '#/join';
+    setTimeout(() => {
+      location.hash = '#/join';
+    }, 2000);
     return;
   }
   
-  if (session.participants.size >= 100) {
-    showToast('Session is full (100/100)', 'error');
-    location.hash = '#/join';
+  const participantCount = session.participants instanceof Set ? session.participants.size : (Array.isArray(session.participants) ? session.participants.length : 0);
+  if (participantCount >= 100) {
+    console.warn('[Student] Session is full:', sessionId);
+    showToast('Session is full (100/100 participants)', 'error');
+    setTimeout(() => {
+      location.hash = '#/join';
+    }, 2000);
     return;
   }
   
   // Check if already submitted
   const hasSubmitted = session.messages.some(m => m.participantId === AppState.socketId);
   if (hasSubmitted) {
+    console.log('[Student] Already submitted to this session');
     location.hash = `#/student/submitted/${sessionId}`;
     return;
   }
+  
+  // Add participant when they land on the page
+  SessionManager.addParticipant(sessionId, AppState.socketId);
+  
+  // Fire event
+  window.dispatchEvent(new CustomEvent('participantJoined', { 
+    detail: { sessionId, participantId: AppState.socketId } 
+  }));
+  
+  const updatedSession = getSession(sessionId);
+  const currentParticipants = updatedSession.participants instanceof Set ? updatedSession.participants.size : (Array.isArray(updatedSession.participants) ? updatedSession.participants.length : 0);
   
   const app = document.getElementById('app');
   app.innerHTML = `
@@ -730,7 +1070,7 @@ function renderStudentLanding(sessionId) {
           </div>
           <h2 style="margin: 24px 0;">${session.question || 'Share Your Thoughts'}</h2>
           <p style="font-size: 18px; opacity: 0.7; margin-bottom: 32px;">
-            👥 ${session.participants.size} students already participating
+            👥 ${currentParticipants} students already participating
           </p>
           <button class="btn btn-primary btn-large btn-full" onclick="location.hash='#/student/compose/${sessionId}'">🚀 Start Writing</button>
         </div>
@@ -740,10 +1080,15 @@ function renderStudentLanding(sessionId) {
 }
 
 function renderComposer(sessionId) {
+  console.log('[Student] Rendering composer for session:', sessionId);
+  
   const session = getSession(sessionId);
   if (!session || !session.isActive) {
+    console.error('[Student] Session not available:', sessionId);
     showToast('Session not available', 'error');
-    location.hash = '#/join';
+    setTimeout(() => {
+      location.hash = '#/join';
+    }, 2000);
     return;
   }
   
@@ -764,6 +1109,7 @@ function renderComposer(sessionId) {
           <div class="mode-badge ${session.mode === 'free' ? 'mode-free' : 'mode-question'}">
             ${session.mode === 'free' ? '✍️ Free Mind Mode' : '❓ A/B Question'}
           </div>
+          <p style="text-align: center; font-size: 14px; opacity: 0.6; margin-top: 8px;">Session: ${sessionId}</p>
         </div>
         
         ${session.mode === 'question' ? `
@@ -900,7 +1246,15 @@ function insertEmoji(emoji) {
 function handleSubmitMessage(event, sessionId) {
   event.preventDefault();
   
+  console.log('[Student] Submitting message to session:', sessionId);
+  
   const session = getSession(sessionId);
+  if (!session) {
+    console.error('[Student] Session not found when submitting:', sessionId);
+    showToast('Session not found', 'error');
+    return;
+  }
+  
   const messageText = document.getElementById('message-text').value.trim();
   const studentName = document.getElementById('student-name').value.trim();
   const isAnonymous = document.getElementById('anonymous').checked;
@@ -928,21 +1282,32 @@ function handleSubmitMessage(event, sessionId) {
     selectedOption: window.selectedOption || null
   };
   
+  console.log('[Student] Message data:', message);
+  
   const success = addMessage(sessionId, message);
   
   if (success) {
+    console.log('[Student] Message sent successfully');
     showToast('Message sent! 🎉', 'success');
-    location.hash = `#/student/submitted/${sessionId}`;
+    setTimeout(() => {
+      location.hash = `#/student/submitted/${sessionId}`;
+    }, 500);
   } else {
-    showToast('Failed to send message', 'error');
+    console.error('[Student] Failed to send message');
+    showToast('Failed to send message. Session may be full or ended.', 'error');
   }
 }
 
 function renderSubmitted(sessionId) {
+  console.log('[Student] Rendering submitted view for session:', sessionId);
+  
   const session = getSession(sessionId);
   if (!session) {
+    console.error('[Student] Session not found:', sessionId);
     showToast('Session not found', 'error');
-    location.hash = '#/join';
+    setTimeout(() => {
+      location.hash = '#/join';
+    }, 2000);
     return;
   }
   
@@ -975,6 +1340,23 @@ function renderSubmitted(sessionId) {
   setTimeout(() => {
     initOceanScene('ocean-canvas', session.messages, false);
   }, 200);
+  
+  // Listen for updates
+  const updateListener = () => {
+    const currentSession = getSession(sessionId);
+    if (currentSession) {
+      const messageCountEl = document.querySelector('.card p[style*="font-weight"]');
+      if (messageCountEl) {
+        messageCountEl.textContent = `💬 ${currentSession.messages.length} messages collected so far`;
+      }
+      
+      // Update ocean scene
+      updateOceanBottles(currentSession.messages);
+    }
+  };
+  
+  onEvent('messageAdded', updateListener);
+  onEvent('stateUpdate', updateListener);
   
   // Listen for session close
   onEvent('sessionClosed', (data) => {
