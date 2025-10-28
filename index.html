@@ -3,800 +3,1680 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Message in a Bottle - Collaborative Learning</title>
-
-    <!-- Supabase Client Library -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-    <!-- Three.js for 3D Ocean -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-
+    <title>Message in a Bottle - Collaboration App</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+:root {
+  --primary: #0077BE;
+  --secondary: #20B2AA;
+  --accent: #FF6B6B;
+  --success: #4CAF50;
+  --warning: #FF9800;
+  --bg-gradient-start: #E3F2FD;
+  --bg-gradient-end: #BBDEFB;
+  --text-dark: #1A1A1A;
+  --text-light: #FFFFFF;
+  --card-bg: #FFFFFF;
+  --shadow: rgba(0, 0, 0, 0.1);
+  --border-radius: 12px;
+  --transition: 300ms ease;
+}
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-        }
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
+  min-height: 100vh;
+  color: var(--text-dark);
+  line-height: 1.6;
+}
 
-        .card {
-            background: white;
-            border-radius: 20px;
-            padding: 40px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            margin: 20px 0;
-        }
+#app {
+  min-height: 100vh;
+}
 
-        h1 {
-            color: #667eea;
-            text-align: center;
-            margin-bottom: 30px;
-            font-size: 2.5em;
-        }
+.btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: var(--border-radius);
+  font-size: 16px;
+  font-weight: 600;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all var(--transition);
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
 
-        .btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 15px 40px;
-            border-radius: 50px;
-            font-size: 18px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: transform 0.3s;
-            width: 100%;
-            margin: 10px 0;
-        }
+.btn-primary {
+  background: var(--primary);
+  color: var(--text-light);
+}
 
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-        }
+.btn-primary:hover:not(:disabled) {
+  background: #005A8F;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 119, 190, 0.3);
+}
 
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
+.btn-secondary {
+  background: var(--secondary);
+  color: var(--text-light);
+}
 
-        input, textarea, select {
-            width: 100%;
-            padding: 15px;
-            margin: 10px 0;
-            border: 2px solid #ddd;
-            border-radius: 10px;
-            font-size: 16px;
-        }
+.btn-secondary:hover:not(:disabled) {
+  background: #1A9B95;
+  transform: translateY(-2px);
+}
 
-        textarea {
-            min-height: 150px;
-            resize: vertical;
-        }
+.btn-danger {
+  background: var(--accent);
+  color: var(--text-light);
+}
 
-        .hidden {
-            display: none !important;
-        }
+.btn-danger:hover:not(:disabled) {
+  background: #E55555;
+  transform: translateY(-2px);
+}
 
-        #canvas-container {
-            width: 100%;
-            height: 500px;
-            border-radius: 15px;
-            overflow: hidden;
-            background: linear-gradient(180deg, #87CEEB 0%, #4682B4 100%);
-        }
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
-        .qr-display {
-            text-align: center;
-            padding: 30px;
-            background: #f8f9fa;
-            border-radius: 15px;
-            margin: 20px 0;
-        }
+.btn-large {
+  padding: 16px 32px;
+  font-size: 18px;
+}
 
-        .session-code {
-            font-size: 48px;
-            font-weight: bold;
-            color: #667eea;
-            letter-spacing: 10px;
-            margin: 20px 0;
-        }
+.btn-full {
+  width: 100%;
+}
 
-        .stats {
-            display: flex;
-            justify-content: space-around;
-            margin: 20px 0;
-            flex-wrap: wrap;
-        }
+.card {
+  background: var(--card-bg);
+  border-radius: var(--border-radius);
+  padding: 24px;
+  box-shadow: 0 4px 12px var(--shadow);
+  transition: all var(--transition);
+}
 
-        .stat-box {
-            text-align: center;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 10px;
-            min-width: 150px;
-            margin: 10px;
-        }
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
 
-        .stat-number {
-            font-size: 36px;
-            font-weight: bold;
-            color: #667eea;
-        }
+.header {
+  background: var(--primary);
+  color: var(--text-light);
+  padding: 16px 20px;
+  box-shadow: 0 2px 8px var(--shadow);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
 
-        .stat-label {
-            color: #666;
-            margin-top: 5px;
-        }
+.header h1 {
+  font-size: 24px;
+  font-weight: bold;
+}
 
-        .error-message {
-            background: #fee;
-            color: #c33;
-            padding: 15px;
-            border-radius: 10px;
-            margin: 10px 0;
-            border-left: 4px solid #c33;
-        }
+.landing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  text-align: center;
+  padding: 20px;
+}
 
-        .success-message {
-            background: #efe;
-            color: #3c3;
-            padding: 15px;
-            border-radius: 10px;
-            margin: 10px 0;
-            border-left: 4px solid #3c3;
-        }
+.landing h1 {
+  font-size: 48px;
+  margin-bottom: 16px;
+  color: var(--primary);
+}
 
-        .emoji-picker {
-            display: grid;
-            grid-template-columns: repeat(8, 1fr);
-            gap: 5px;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 10px;
-            margin: 10px 0;
-            max-height: 200px;
-            overflow-y: auto;
-        }
+.landing p {
+  font-size: 20px;
+  margin-bottom: 48px;
+  color: var(--text-dark);
+  opacity: 0.8;
+}
 
-        .emoji-btn {
-            background: none;
-            border: none;
-            font-size: 24px;
-            cursor: pointer;
-            padding: 8px;
-            border-radius: 5px;
-            transition: background 0.2s;
-        }
+.landing-buttons {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
 
-        .emoji-btn:hover {
-            background: #ddd;
-        }
+.session-code {
+  font-family: 'Courier New', monospace;
+  font-size: 28px;
+  font-weight: bold;
+  color: var(--primary);
+  background: var(--bg-gradient-start);
+  padding: 16px;
+  border-radius: 8px;
+  margin: 16px 0;
+  letter-spacing: 4px;
+  text-align: center;
+  border: 3px solid var(--primary);
+  box-shadow: 0 4px 12px var(--shadow);
+}
 
-        .word-counter {
-            text-align: right;
-            margin: 10px 0;
-            font-size: 18px;
-            font-weight: bold;
-        }
+.form-group {
+  margin-bottom: 24px;
+}
 
-        .word-counter.valid {
-            color: #4CAF50;
-        }
+.form-group label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 8px;
+  font-size: 16px;
+}
 
-        .word-counter.invalid {
-            color: #f44336;
-        }
+.form-control {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #DDD;
+  border-radius: 8px;
+  font-size: 16px;
+  transition: border-color var(--transition);
+}
 
-        @media (max-width: 768px) {
-            h1 {
-                font-size: 1.8em;
-            }
+.form-control:focus {
+  outline: none;
+  border-color: var(--primary);
+}
 
-            .session-code {
-                font-size: 32px;
-                letter-spacing: 5px;
-            }
+.radio-group {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+}
 
-            .card {
-                padding: 20px;
-            }
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
 
-            #canvas-container {
-                height: 300px;
-            }
-        }
+.monitor-info {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 24px;
+  margin-bottom: 24px;
+}
 
-        .loading {
-            text-align: center;
-            padding: 40px;
-        }
+.info-item {
+  text-align: center;
+}
 
-        .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #667eea;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            animation: spin 1s linear infinite;
-            margin: 20px auto;
-        }
+.info-label {
+  font-size: 14px;
+  opacity: 0.7;
+  margin-bottom: 8px;
+}
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+.info-value {
+  font-size: 32px;
+  font-weight: bold;
+  color: var(--primary);
+}
+
+.qr-container {
+  text-align: center;
+  padding: 24px;
+  background: white;
+  border-radius: var(--border-radius);
+  display: inline-block;
+}
+
+.ocean-container {
+  width: 100%;
+  height: 500px;
+  position: relative;
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  background: linear-gradient(to bottom, #87CEEB 0%, #1E90FF 100%);
+}
+
+.ocean-placeholder {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(180deg, #87CEEB 0%, #4682B4 100%);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 18px;
+}
+
+.code-input {
+  text-align: center;
+  font-size: 28px;
+  font-family: 'Courier New', monospace;
+  text-transform: uppercase;
+  letter-spacing: 6px;
+  padding: 20px;
+  border: 3px solid var(--primary);
+  font-weight: bold;
+}
+
+.mode-badge {
+  display: inline-block;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.mode-free {
+  background: var(--secondary);
+  color: white;
+}
+
+.mode-question {
+  background: var(--primary);
+  color: white;
+}
+
+.question-box {
+  background: var(--bg-gradient-start);
+  padding: 24px;
+  border-radius: var(--border-radius);
+  margin-bottom: 24px;
+  border-left: 4px solid var(--primary);
+}
+
+.options {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.option-card {
+  flex: 1;
+  min-width: 200px;
+  padding: 16px;
+  border: 2px solid #DDD;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: all var(--transition);
+  text-align: center;
+}
+
+.option-card:hover {
+  border-color: var(--primary);
+  background: var(--bg-gradient-start);
+}
+
+.option-card.selected {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: white;
+}
+
+.textarea {
+  width: 100%;
+  min-height: 150px;
+  padding: 16px;
+  border: 2px solid #DDD;
+  border-radius: var(--border-radius);
+  font-size: 16px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.word-counter {
+  text-align: right;
+  font-size: 14px;
+  margin-top: 8px;
+  font-weight: 600;
+}
+
+.word-counter.valid {
+  color: var(--success);
+}
+
+.word-counter.invalid {
+  color: var(--accent);
+}
+
+.emoji-picker {
+  background: white;
+  border: 2px solid #DDD;
+  border-radius: var(--border-radius);
+  padding: 16px;
+  margin-top: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+  gap: 8px;
+}
+
+.emoji-item {
+  font-size: 24px;
+  cursor: pointer;
+  text-align: center;
+  padding: 8px;
+  border-radius: 8px;
+  transition: background var(--transition);
+}
+
+.emoji-item:hover {
+  background: var(--bg-gradient-start);
+}
+
+.checkbox-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  animation: fadeIn var(--transition);
+}
+
+.modal {
+  background: var(--card-bg);
+  border-radius: var(--border-radius);
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: slideUp var(--transition);
+}
+
+.modal-header {
+  padding: 24px;
+  border-bottom: 2px solid #EEE;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 28px;
+  cursor: pointer;
+  color: var(--text-dark);
+  opacity: 0.6;
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+.modal-footer {
+  padding: 24px;
+  border-top: 2px solid #EEE;
+  display: flex;
+  gap: 16px;
+  justify-content: flex-end;
+}
+
+.message-meta {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #EEE;
+  flex-wrap: wrap;
+}
+
+.meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.meta-label {
+  font-size: 12px;
+  opacity: 0.6;
+  text-transform: uppercase;
+}
+
+.meta-value {
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.message-text {
+  font-size: 18px;
+  line-height: 1.8;
+  padding: 16px;
+  background: var(--bg-gradient-start);
+  border-radius: 8px;
+}
+
+#toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.toast {
+  background: var(--card-bg);
+  padding: 16px 24px;
+  border-radius: var(--border-radius);
+  box-shadow: 0 4px 12px var(--shadow);
+  min-width: 300px;
+  max-width: 500px;
+  animation: slideInRight var(--transition);
+  border-left: 4px solid var(--primary);
+}
+
+.toast.success {
+  border-left-color: var(--success);
+}
+
+.toast.error {
+  border-left-color: var(--accent);
+  font-weight: 600;
+}
+
+.spinner {
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  border-left-color: var(--primary);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+  margin: 20px auto;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 768px) {
+  .landing h1 {
+    font-size: 32px;
+  }
+  
+  .landing-buttons {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .session-code {
+    font-size: 20px;
+    letter-spacing: 2px;
+  }
+  
+  .code-input {
+    font-size: 20px;
+    letter-spacing: 3px;
+  }
+  
+  .options {
+    flex-direction: column;
+  }
+}
     </style>
 </head>
 <body>
-    <div class="container" id="app">
-        <!-- Landing Page -->
-        <div id="landing-page">
-            <div class="card">
-                <h1>🍾 Message in a Bottle</h1>
-                <p style="text-align: center; color: #666; margin-bottom: 30px;">
-                    A gamified collaboration tool for students to share their thoughts
-                </p>
-                <button class="btn" onclick="router.navigate('teacher/dashboard')">
-                    👨‍🏫 I'm a Teacher
-                </button>
-                <button class="btn" onclick="router.navigate('student/join')">
-                    🎓 I'm a Student
-                </button>
-            </div>
+    <div id="app">
+        <div class="landing">
+            <div class="spinner"></div>
+            <p>Loading...</p>
         </div>
     </div>
 
+    <div id="toast-container"></div>
+
+    <!-- External Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
     <script>
-        // ==========================================
-        // SUPABASE CONFIGURATION
-        // ==========================================
-        // TODO: Replace with your Supabase URL and Key
-        const SUPABASE_URL = 'https://jqugywwoklzquynlpqxv.supabase.co/';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpxdWd5d3dva2x6cXV5bmxwcXh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE2NDEzMjIsImV4cCI6MjA3NzIxNzMyMn0.FwTyvSc4FyswoDtpaMBazKyhXc023yGlN4SUhOhOwTc';
+// Initialize Supabase
+const SUPABASE_URL = 'https://jqugywwoklzquynlpqxv.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpxdWd5d3dva2x6cXV5bmxwcXh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE2NDEzMjIsImV4cCI6MjA3NzIxNzMyMn0.FwTyvSc4FyswoDtpaMBazKyhXc023yGlN4SUhOhOwTc';
 
-        // Initialize Supabase client
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // ==========================================
-        // GLOBAL STATE & UTILITIES
-        // ==========================================
-        const state = {
-            currentUser: 'user_' + Math.random().toString(36).substr(2, 9),
-            currentSession: null,
-            currentRole: null
-        };
+// Global State
+const AppState = {
+  currentView: null,
+  currentSession: null,
+  participantId: null,
+  subscriptions: [],
+  updateTimers: {}
+};
 
-        // Generate session code
-        function generateSessionCode() {
-            return Math.random().toString(36).substring(2, 10).toUpperCase();
+// Utility Functions
+function generateId(prefix = 'id') {
+  return prefix + '_' + Math.random().toString(36).substring(2, 15) + '_' + Date.now();
+}
+
+function generateSessionCode() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code = '';
+  for (let i = 0; i < 8; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
+function countWords(text) {
+  return text.trim().split(/\s+/).filter(w => w.length > 0).length;
+}
+
+function formatTime(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
+
+function showToast(message, type = 'info') {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+  
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    setTimeout(() => toast.remove(), 300);
+  }, 4000);
+}
+
+function copyToClipboard(text, successMessage = 'Copied!') {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      showToast(successMessage, 'success');
+    }).catch(() => {
+      fallbackCopy(text, successMessage);
+    });
+  } else {
+    fallbackCopy(text, successMessage);
+  }
+}
+
+function fallbackCopy(text, successMessage) {
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  try {
+    document.execCommand('copy');
+    showToast(successMessage, 'success');
+  } catch (err) {
+    showToast('Could not copy', 'error');
+  }
+  document.body.removeChild(textarea);
+}
+
+// Supabase Functions
+async function createSession(config) {
+  try {
+    const sessionId = generateSessionCode();
+    const sessionData = {
+      id: sessionId,
+      mode: config.mode,
+      question: config.question || null,
+      option_a: config.optionA || null,
+      option_b: config.optionB || null,
+      timeout_minutes: Math.floor(config.timeout / 60),
+      is_active: true,
+      created_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + config.timeout * 1000).toISOString()
+    };
+    
+    const { data, error } = await supabase
+      .from('sessions')
+      .insert([sessionData])
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error creating session:', error);
+      showToast('Failed to create session: ' + error.message, 'error');
+      return null;
+    }
+    
+    console.log('Session created:', data);
+    return data;
+  } catch (err) {
+    console.error('Create session error:', err);
+    showToast('Failed to create session', 'error');
+    return null;
+  }
+}
+
+async function getSession(sessionId) {
+  try {
+    const { data, error } = await supabase
+      .from('sessions')
+      .select('*')
+      .eq('id', sessionId)
+      .single();
+    
+    if (error) {
+      console.error('Error fetching session:', error);
+      return null;
+    }
+    
+    return data;
+  } catch (err) {
+    console.error('Get session error:', err);
+    return null;
+  }
+}
+
+async function getActiveSessions() {
+  try {
+    const { data, error } = await supabase
+      .from('sessions')
+      .select('*')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching sessions:', error);
+      return [];
+    }
+    
+    return data || [];
+  } catch (err) {
+    console.error('Get sessions error:', err);
+    return [];
+  }
+}
+
+async function joinSession(sessionId) {
+  try {
+    const participantId = generateId('participant');
+    
+    const { error } = await supabase
+      .from('participants')
+      .insert([{
+        id: participantId,
+        session_id: sessionId,
+        joined_at: new Date().toISOString()
+      }]);
+    
+    if (error) {
+      console.error('Error joining session:', error);
+      return null;
+    }
+    
+    AppState.participantId = participantId;
+    return participantId;
+  } catch (err) {
+    console.error('Join session error:', err);
+    return null;
+  }
+}
+
+async function submitMessage(sessionId, messageData) {
+  try {
+    const message = {
+      session_id: sessionId,
+      participant_id: AppState.participantId,
+      student_name: messageData.studentName || null,
+      is_anonymous: messageData.isAnonymous,
+      selected_option: messageData.selectedOption || null,
+      message_text: messageData.messageText,
+      word_count: countWords(messageData.messageText),
+      is_read: false,
+      created_at: new Date().toISOString()
+    };
+    
+    const { data, error } = await supabase
+      .from('messages')
+      .insert([message])
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error submitting message:', error);
+      showToast('Failed to send message: ' + error.message, 'error');
+      return false;
+    }
+    
+    console.log('Message submitted:', data);
+    return true;
+  } catch (err) {
+    console.error('Submit message error:', err);
+    showToast('Failed to send message', 'error');
+    return false;
+  }
+}
+
+async function getSessionStats(sessionId) {
+  try {
+    const [participantsResult, messagesResult] = await Promise.all([
+      supabase.from('participants').select('id', { count: 'exact' }).eq('session_id', sessionId),
+      supabase.from('messages').select('*').eq('session_id', sessionId)
+    ]);
+    
+    return {
+      participantCount: participantsResult.count || 0,
+      messageCount: messagesResult.data?.length || 0,
+      messages: messagesResult.data || []
+    };
+  } catch (err) {
+    console.error('Get stats error:', err);
+    return { participantCount: 0, messageCount: 0, messages: [] };
+  }
+}
+
+async function closeSession(sessionId) {
+  try {
+    const { error } = await supabase
+      .from('sessions')
+      .update({ is_active: false })
+      .eq('id', sessionId);
+    
+    if (error) {
+      console.error('Error closing session:', error);
+      return false;
+    }
+    
+    return true;
+  } catch (err) {
+    console.error('Close session error:', err);
+    return false;
+  }
+}
+
+async function markMessageAsRead(messageId) {
+  try {
+    const { error } = await supabase
+      .from('messages')
+      .update({ is_read: true })
+      .eq('id', messageId);
+    
+    if (error) {
+      console.error('Error marking as read:', error);
+      return false;
+    }
+    
+    return true;
+  } catch (err) {
+    console.error('Mark as read error:', err);
+    return false;
+  }
+}
+
+// Real-time Subscriptions
+function subscribeToSession(sessionId, onUpdate) {
+  // Clean up existing subscriptions
+  cleanupSubscriptions();
+  
+  // Subscribe to participants
+  const participantsChannel = supabase
+    .channel(`participants-${sessionId}`)
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'participants',
+      filter: `session_id=eq.${sessionId}`
+    }, () => {
+      console.log('New participant joined');
+      onUpdate();
+    })
+    .subscribe();
+  
+  // Subscribe to messages
+  const messagesChannel = supabase
+    .channel(`messages-${sessionId}`)
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'messages',
+      filter: `session_id=eq.${sessionId}`
+    }, () => {
+      console.log('New message received');
+      onUpdate();
+    })
+    .on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'messages',
+      filter: `session_id=eq.${sessionId}`
+    }, () => {
+      console.log('Message updated');
+      onUpdate();
+    })
+    .subscribe();
+  
+  AppState.subscriptions.push(participantsChannel, messagesChannel);
+}
+
+function cleanupSubscriptions() {
+  AppState.subscriptions.forEach(sub => {
+    supabase.removeChannel(sub);
+  });
+  AppState.subscriptions = [];
+  
+  // Clear update timers
+  Object.values(AppState.updateTimers).forEach(timer => clearInterval(timer));
+  AppState.updateTimers = {};
+}
+
+// Router
+function setupRouter() {
+  function handleRoute() {
+    const hash = window.location.hash || '#/';
+    const hashContent = hash.substring(2);
+    const parts = hashContent.split('/');
+    const path = parts[0] || '';
+    const params = parts.slice(1);
+    
+    console.log('Navigating to:', path, params);
+    
+    // Clean up before navigation
+    cleanupSubscriptions();
+    
+    switch (path) {
+      case '':
+        renderLanding();
+        break;
+      case 'teacher':
+        if (params[0] === 'dashboard') {
+          renderTeacherDashboard();
+        } else if (params[0] === 'create') {
+          renderCreateSession();
+        } else if (params[0] === 'monitor' && params[1]) {
+          renderMonitor(params[1].toUpperCase());
+        } else if (params[0] === 'review' && params[1]) {
+          renderReview(params[1].toUpperCase());
+        } else {
+          renderTeacherDashboard();
         }
-
-        // Generate bottle color
-        function generateBottleColor() {
-            const hue = Math.floor(Math.random() * 360);
-            return `hsl(${hue}, 60%, 70%)`;
+        break;
+      case 'join':
+        if (params[0]) {
+          renderStudentLanding(params[0].toUpperCase());
+        } else {
+          renderStudentJoin();
         }
-
-        // Count words
-        function countWords(text) {
-            return text.trim().split(/\s+/).filter(word => word.length > 0).length;
+        break;
+      case 'student':
+        if (params[0] === 'compose' && params[1]) {
+          renderComposer(params[1].toUpperCase());
+        } else if (params[0] === 'submitted' && params[1]) {
+          renderSubmitted(params[1].toUpperCase());
+        } else {
+          renderStudentJoin();
         }
+        break;
+      default:
+        renderLanding();
+    }
+  }
+  
+  window.addEventListener('hashchange', handleRoute);
+  handleRoute();
+}
 
-        // Simple router
-        const router = {
-            routes: {},
-            currentRoute: null,
+// Safe DOM Update Helper
+function updateElement(id, content) {
+  const element = document.getElementById(id);
+  if (element) {
+    element.textContent = content;
+  }
+}
 
-            register(path, component) {
-                this.routes[path] = component;
-            },
+function updateHTML(id, html) {
+  const element = document.getElementById(id);
+  if (element) {
+    element.innerHTML = html;
+  }
+}
 
-            navigate(path, params = {}) {
-                window.location.hash = path;
-                this.currentRoute = path;
-                const component = this.routes[path];
-                if (component) {
-                    document.getElementById('app').innerHTML = component(params);
-                    // Execute any onMount hooks
-                    if (this.onMount) this.onMount();
-                }
-            },
+// View Renderers
+function renderLanding() {
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="landing">
+      <h1>🏖️ Message in a Bottle</h1>
+      <p>A collaborative learning experience where ideas float freely</p>
+      <div class="landing-buttons">
+        <button class="btn btn-primary btn-large" onclick="location.hash='#/teacher/dashboard'">👨‍🏫 I'm a Teacher</button>
+        <button class="btn btn-secondary btn-large" onclick="location.hash='#/join'">🎓 I'm a Student</button>
+      </div>
+    </div>
+  `;
+}
 
-            onMount: null
-        };
+async function renderTeacherDashboard() {
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="header">
+      <h1>📊 Teacher Dashboard</h1>
+    </div>
+    <div class="container">
+      <h2 style="margin: 24px 0;">Your Sessions</h2>
+      <div id="sessions-container">
+        <div class="spinner"></div>
+      </div>
+    </div>
+  `;
+  
+  const sessions = await getActiveSessions();
+  
+  const container = document.getElementById('sessions-container');
+  if (!container) return;
+  
+  container.innerHTML = `
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px;">
+      <div class="card" onclick="location.hash='#/teacher/create'" style="cursor: pointer; display: flex; align-items: center; justify-content: center; min-height: 200px; border: 2px dashed var(--primary);">
+        <div style="text-align: center;">
+          <div style="font-size: 48px; margin-bottom: 16px;">➕</div>
+          <h3>Create New Session</h3>
+        </div>
+      </div>
+      ${sessions.map(session => `
+        <div class="card" onclick="location.hash='#/teacher/monitor/${session.id}'" style="cursor: pointer;">
+          <h3>${session.mode === 'free' ? '✍️ Free Mind' : '❓ A/B Question'}</h3>
+          <p>${session.question || 'Open thoughts and ideas'}</p>
+          <div class="session-code" style="font-size: 20px; margin: 12px 0;">${session.id}</div>
+          <p style="font-size: 14px; opacity: 0.7;">Created ${new Date(session.created_at).toLocaleTimeString()}</p>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
 
-        // ==========================================
-        // TEACHER COMPONENTS
-        // ==========================================
+function renderCreateSession() {
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="header">
+      <h1>✨ Create New Session</h1>
+    </div>
+    <div class="container" style="max-width: 600px;">
+      <div class="card">
+        <form id="create-form" onsubmit="handleCreateSession(event)">
+          <div class="form-group">
+            <label>Session Mode</label>
+            <div class="radio-group">
+              <label class="radio-option">
+                <input type="radio" name="mode" value="free" checked onchange="toggleQuestionFields()">
+                <span>✍️ Free Mind Mode</span>
+              </label>
+              <label class="radio-option">
+                <input type="radio" name="mode" value="question" onchange="toggleQuestionFields()">
+                <span>❓ A/B Question Mode</span>
+              </label>
+            </div>
+          </div>
+          
+          <div id="question-fields" style="display: none;">
+            <div class="form-group">
+              <label>Your Question</label>
+              <input type="text" class="form-control" id="question" placeholder="What would you like to ask?">
+            </div>
+            <div class="form-group">
+              <label>Option A</label>
+              <input type="text" class="form-control" id="optionA" placeholder="First option">
+            </div>
+            <div class="form-group">
+              <label>Option B</label>
+              <input type="text" class="form-control" id="optionB" placeholder="Second option">
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label>Session Timeout (minutes)</label>
+            <input type="number" class="form-control" id="timeout" min="1" max="10" value="5">
+          </div>
+          
+          <div style="display: flex; gap: 16px;">
+            <button type="submit" class="btn btn-primary btn-full">🚀 Create Session</button>
+            <button type="button" class="btn btn-secondary" onclick="location.hash='#/teacher/dashboard'">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+}
 
-        // Teacher Dashboard
-        router.register('teacher/dashboard', (params) => {
-            return `
-                <div class="card">
-                    <h1>👨‍🏫 Teacher Dashboard</h1>
-                    <button class="btn" onclick="router.navigate('teacher/create')">
-                        ➕ Create New Session
-                    </button>
-                    <button class="btn" onclick="router.navigate('')" style="background: #999;">
-                        ← Back to Home
-                    </button>
+window.toggleQuestionFields = function() {
+  const mode = document.querySelector('input[name="mode"]:checked')?.value;
+  const fields = document.getElementById('question-fields');
+  if (fields) {
+    fields.style.display = mode === 'question' ? 'block' : 'none';
+  }
+};
+
+window.handleCreateSession = async function(event) {
+  event.preventDefault();
+  
+  const mode = document.querySelector('input[name="mode"]:checked')?.value;
+  const timeout = parseInt(document.getElementById('timeout')?.value || '5') * 60;
+  
+  const config = { mode, timeout };
+  
+  if (mode === 'question') {
+    const question = document.getElementById('question')?.value.trim();
+    const optionA = document.getElementById('optionA')?.value.trim();
+    const optionB = document.getElementById('optionB')?.value.trim();
+    
+    if (!question || !optionA || !optionB) {
+      showToast('Please fill in all question fields', 'error');
+      return;
+    }
+    
+    config.question = question;
+    config.optionA = optionA;
+    config.optionB = optionB;
+  }
+  
+  const session = await createSession(config);
+  if (session) {
+    showToast(`Session created! Code: ${session.id}`, 'success');
+    setTimeout(() => {
+      location.hash = `#/teacher/monitor/${session.id}`;
+    }, 500);
+  }
+};
+
+async function renderMonitor(sessionId) {
+  const session = await getSession(sessionId);
+  if (!session) {
+    showToast('Session not found', 'error');
+    location.hash = '#/teacher/dashboard';
+    return;
+  }
+  
+  const stats = await getSessionStats(sessionId);
+  const joinUrl = `${window.location.origin}${window.location.pathname}#/join/${sessionId}`;
+  
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="header">
+      <h1>📡 Event Monitor</h1>
+    </div>
+    <div class="container">
+      <div class="card" style="margin-bottom: 24px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start;">
+          <div class="qr-container">
+            <h3 style="margin-bottom: 16px;">Scan to Join</h3>
+            <div id="qr-code"></div>
+            <div class="session-code" style="cursor: pointer; margin-top: 16px;" onclick="copyToClipboard('${sessionId}', 'Code copied!')" title="Click to copy">
+              ${sessionId}
+            </div>
+          </div>
+          <div class="monitor-info">
+            <div class="info-item">
+              <div class="info-label">Participants</div>
+              <div class="info-value" id="participant-count">${stats.participantCount}</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">Messages</div>
+              <div class="info-value" id="message-count">${stats.messageCount}</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">Time Remaining</div>
+              <div class="info-value" id="timer" style="font-family: monospace;">--:--</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="card">
+        <h3 style="margin-bottom: 16px;">🌊 Messages Collected</h3>
+        <div class="ocean-container">
+          <div class="ocean-placeholder">
+            ${stats.messageCount} bottle${stats.messageCount !== 1 ? 's' : ''} floating in the ocean
+          </div>
+        </div>
+        <div style="margin-top: 16px; display: flex; gap: 16px; justify-content: center;">
+          <button class="btn btn-danger" onclick="handleForceClose('${sessionId}')">⛔ Close Session</button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  // Generate QR Code
+  setTimeout(() => {
+    const qrContainer = document.getElementById('qr-code');
+    if (qrContainer && typeof QRCode !== 'undefined') {
+      new QRCode(qrContainer, {
+        text: joinUrl,
+        width: 256,
+        height: 256
+      });
+    }
+  }, 100);
+  
+  // Start timer
+  startSessionTimer(sessionId, session.expires_at);
+  
+  // Subscribe to updates
+  subscribeToSession(sessionId, async () => {
+    const newStats = await getSessionStats(sessionId);
+    updateElement('participant-count', newStats.participantCount);
+    updateElement('message-count', newStats.messageCount);
+  });
+}
+
+function startSessionTimer(sessionId, expiresAt) {
+  function updateTimer() {
+    const now = Date.now();
+    const end = new Date(expiresAt).getTime();
+    const remaining = Math.max(0, Math.floor((end - now) / 1000));
+    
+    updateElement('timer', formatTime(remaining));
+    
+    if (remaining <= 0) {
+      handleAutoClose(sessionId);
+      return;
+    }
+    
+    setTimeout(updateTimer, 1000);
+  }
+  
+  updateTimer();
+}
+
+window.handleForceClose = async function(sessionId) {
+  if (!confirm('Are you sure you want to close this session?')) return;
+  
+  const success = await closeSession(sessionId);
+  if (success) {
+    showToast('Session closed', 'success');
+    location.hash = `#/teacher/review/${sessionId}`;
+  }
+};
+
+async function handleAutoClose(sessionId) {
+  await closeSession(sessionId);
+  showToast('Session timeout', 'info');
+  location.hash = `#/teacher/review/${sessionId}`;
+}
+
+async function renderReview(sessionId) {
+  const session = await getSession(sessionId);
+  if (!session) {
+    showToast('Session not found', 'error');
+    location.hash = '#/teacher/dashboard';
+    return;
+  }
+  
+  const stats = await getSessionStats(sessionId);
+  const unreadMessages = stats.messages.filter(m => !m.is_read);
+  
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="header">
+      <h1>📖 Review Messages</h1>
+    </div>
+    <div class="container">
+      <div class="card" style="margin-bottom: 24px;">
+        <h3>Session: ${sessionId}</h3>
+        <p>Total messages: ${stats.messageCount} | Unread: ${unreadMessages.length}</p>
+      </div>
+      
+      <div id="messages-list">
+        ${stats.messages.map(msg => `
+          <div class="card" style="margin-bottom: 16px; ${msg.is_read ? 'opacity: 0.6;' : ''}">
+            <div style="display: flex; justify-content: space-between; align-items: start; gap: 16px;">
+              <div style="flex: 1;">
+                <div style="display: flex; gap: 16px; margin-bottom: 8px; font-size: 14px; opacity: 0.7;">
+                  <span>${msg.is_anonymous ? '🎭 Anonymous' : msg.student_name || 'Unknown'}</span>
+                  ${msg.selected_option ? `<span>Option ${msg.selected_option}</span>` : ''}
+                  <span>${msg.word_count} words</span>
                 </div>
-            `;
-        });
-
-        // Teacher Create Session
-        router.register('teacher/create', (params) => {
-            return `
-                <div class="card">
-                    <h1>Create New Session</h1>
-
-                    <div>
-                        <label>
-                            <input type="radio" name="mode" value="free" checked onchange="toggleQuestionFields()">
-                            Free Mind Mode (Students write anything)
-                        </label>
-                    </div>
-                    <div>
-                        <label>
-                            <input type="radio" name="mode" value="question" onchange="toggleQuestionFields()">
-                            A/B Question Mode
-                        </label>
-                    </div>
-
-                    <div id="question-fields" class="hidden" style="margin-top: 20px;">
-                        <input type="text" id="question-text" placeholder="Enter your question (e.g., What learning style do you prefer?)">
-                        <input type="text" id="option-a" placeholder="Option A (e.g., Visual Learning)">
-                        <input type="text" id="option-b" placeholder="Option B (e.g., Auditory Learning)">
-                    </div>
-
-                    <div style="margin-top: 20px;">
-                        <label>Timeout (minutes):</label>
-                        <input type="number" id="timeout" min="1" max="10" value="2">
-                    </div>
-
-                    <button class="btn" onclick="createSession()">
-                        🚀 Launch Session
-                    </button>
-                    <button class="btn" onclick="router.navigate('teacher/dashboard')" style="background: #999;">
-                        ← Back
-                    </button>
-
-                    <div id="create-status"></div>
-                </div>
-            `;
-        });
-
-        function toggleQuestionFields() {
-            const mode = document.querySelector('input[name="mode"]:checked').value;
-            const fields = document.getElementById('question-fields');
-            if (mode === 'question') {
-                fields.classList.remove('hidden');
-            } else {
-                fields.classList.add('hidden');
-            }
-        }
-
-        async function createSession() {
-            const mode = document.querySelector('input[name="mode"]:checked').value;
-            const timeout = parseInt(document.getElementById('timeout').value);
-            const sessionId = generateSessionCode();
-
-            let sessionData = {
-                id: sessionId,
-                mode: mode,
-                timeout_minutes: timeout,
-                is_active: true,
-                participant_count: 0
-            };
-
-            if (mode === 'question') {
-                const question = document.getElementById('question-text').value;
-                const optionA = document.getElementById('option-a').value;
-                const optionB = document.getElementById('option-b').value;
-
-                if (!question || !optionA || !optionB) {
-                    alert('Please fill in all question fields!');
-                    return;
-                }
-
-                sessionData.question = question;
-                sessionData.option_a = optionA;
-                sessionData.option_b = optionB;
-            }
-
-            // Insert into Supabase
-            const { data, error } = await supabase
-                .from('sessions')
-                .insert([sessionData]);
-
-            if (error) {
-                document.getElementById('create-status').innerHTML = `
-                    <div class="error-message">Error creating session: ${error.message}</div>
-                `;
-                return;
-            }
-
-            state.currentSession = sessionId;
-            router.navigate('teacher/monitor', { sessionId });
-        }
-
-        // Teacher Monitor
-        router.register('teacher/monitor', (params) => {
-            const sessionId = params.sessionId || state.currentSession;
-
-            setTimeout(() => loadMonitorData(sessionId), 100);
-
-            return `
-                <div class="card">
-                    <h1>📊 Session Monitor</h1>
-
-                    <div class="qr-display">
-                        <h2>Session Code:</h2>
-                        <div class="session-code">${sessionId}</div>
-                        <p>Students can join by entering this code</p>
-                    </div>
-
-                    <div class="stats">
-                        <div class="stat-box">
-                            <div class="stat-number" id="participant-count">0</div>
-                            <div class="stat-label">Participants</div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="stat-number" id="message-count">0</div>
-                            <div class="stat-label">Messages</div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="stat-number" id="time-remaining">--:--</div>
-                            <div class="stat-label">Time Remaining</div>
-                        </div>
-                    </div>
-
-                    <div id="canvas-container"></div>
-
-                    <div style="margin-top: 20px;">
-                        <button class="btn" onclick="closeSession('${sessionId}')">
-                            🛑 Force Close Session
-                        </button>
-                    </div>
-                </div>
-            `;
-        });
-
-        async function loadMonitorData(sessionId) {
-            // Subscribe to realtime updates
-            const messagesChannel = supabase
-                .channel('messages-channel')
-                .on('postgres_changes', 
-                    { event: 'INSERT', schema: 'public', table: 'messages', filter: `session_id=eq.${sessionId}` },
-                    (payload) => {
-                        console.log('New message:', payload.new);
-                        updateMessageCount(sessionId);
-                        // TODO: Add bottle to 3D scene
-                    }
-                )
-                .subscribe();
-
-            const participantsChannel = supabase
-                .channel('participants-channel')
-                .on('postgres_changes',
-                    { event: 'INSERT', schema: 'public', table: 'participants', filter: `session_id=eq.${sessionId}` },
-                    (payload) => {
-                        console.log('New participant:', payload.new);
-                        updateParticipantCount(sessionId);
-                    }
-                )
-                .subscribe();
-
-            // Initial load
-            updateParticipantCount(sessionId);
-            updateMessageCount(sessionId);
-        }
-
-        async function updateParticipantCount(sessionId) {
-            const { data, error } = await supabase
-                .from('participants')
-                .select('*', { count: 'exact' })
-                .eq('session_id', sessionId);
-
-            if (!error && data) {
-                document.getElementById('participant-count').textContent = data.length;
-            }
-        }
-
-        async function updateMessageCount(sessionId) {
-            const { data, error } = await supabase
-                .from('messages')
-                .select('*', { count: 'exact' })
-                .eq('session_id', sessionId);
-
-            if (!error && data) {
-                document.getElementById('message-count').textContent = data.length;
-            }
-        }
-
-        async function closeSession(sessionId) {
-            const { data, error } = await supabase
-                .from('sessions')
-                .update({ is_active: false })
-                .eq('id', sessionId);
-
-            if (!error) {
-                alert('Session closed successfully!');
-                router.navigate('teacher/dashboard');
-            }
-        }
-
-        // ==========================================
-        // STUDENT COMPONENTS
-        // ==========================================
-
-        // Student Join
-        router.register('student/join', (params) => {
-            return `
-                <div class="card">
-                    <h1>🎓 Join Session</h1>
-                    <input type="text" id="join-code" placeholder="Enter 8-character session code" 
-                           maxlength="8" style="text-transform: uppercase;">
-                    <button class="btn" onclick="joinSession()">
-                        🚪 Join Session
-                    </button>
-                    <button class="btn" onclick="router.navigate('')" style="background: #999;">
-                        ← Back to Home
-                    </button>
-                    <div id="join-status"></div>
-                </div>
-            `;
-        });
-
-        async function joinSession() {
-            const code = document.getElementById('join-code').value.toUpperCase().trim();
-
-            if (code.length !== 8) {
-                document.getElementById('join-status').innerHTML = `
-                    <div class="error-message">Please enter a valid 8-character code</div>
-                `;
-                return;
-            }
-
-            // Check if session exists and is active
-            const { data: session, error } = await supabase
-                .from('sessions')
-                .select('*')
-                .eq('id', code)
-                .single();
-
-            if (error || !session) {
-                document.getElementById('join-status').innerHTML = `
-                    <div class="error-message">Session not found. Please check the code.</div>
-                `;
-                return;
-            }
-
-            if (!session.is_active) {
-                document.getElementById('join-status').innerHTML = `
-                    <div class="error-message">This session has ended.</div>
-                `;
-                return;
-            }
-
-            if (session.participant_count >= 100) {
-                document.getElementById('join-status').innerHTML = `
-                    <div class="error-message">Session is full (100/100 participants)</div>
-                `;
-                return;
-            }
-
-            // Add participant
-            const { error: participantError } = await supabase
-                .from('participants')
-                .insert([{
-                    id: state.currentUser,
-                    session_id: code
-                }]);
-
-            if (participantError) {
-                console.error('Error joining session:', participantError);
-            }
-
-            state.currentSession = code;
-            router.navigate('student/compose', { session });
-        }
-
-        // Student Compose
-        router.register('student/compose', (params) => {
-            const session = params.session || {};
-            state.currentSession = session;
-
-            setTimeout(() => setupComposer(session), 100);
-
-            let questionHtml = '';
-            if (session.mode === 'question') {
-                questionHtml = `
-                    <div style="background: #f0f0f0; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
-                        <h3>${session.question}</h3>
-                        <div style="margin-top: 15px;">
-                            <label style="display: block; margin: 10px 0;">
-                                <input type="radio" name="option" value="A" required>
-                                <strong>A:</strong> ${session.option_a}
-                            </label>
-                            <label style="display: block; margin: 10px 0;">
-                                <input type="radio" name="option" value="B" required>
-                                <strong>B:</strong> ${session.option_b}
-                            </label>
-                        </div>
-                    </div>
-                `;
-            }
-
-            return `
-                <div class="card">
-                    <h1>✍️ Write Your Message</h1>
-
-                    ${questionHtml}
-
-                    <input type="text" id="student-name" placeholder="Your name (optional)">
-                    <label>
-                        <input type="checkbox" id="anonymous-check">
-                        Submit anonymously
-                    </label>
-
-                    <textarea id="message-text" placeholder="Share your thoughts... (max 100 words)"></textarea>
-
-                    <div class="word-counter valid" id="word-counter">0 / 100 words</div>
-
-                    <button class="btn" id="emoji-toggle" onclick="toggleEmojis()">
-                        😊 Add Emoji
-                    </button>
-
-                    <div id="emoji-picker" class="hidden"></div>
-
-                    <button class="btn" id="submit-btn" onclick="submitMessage()">
-                        🍾 Throw Bottle
-                    </button>
-
-                    <div id="compose-status"></div>
-                </div>
-            `;
-        });
-
-        function setupComposer(session) {
-            const textarea = document.getElementById('message-text');
-            const counter = document.getElementById('word-counter');
-
-            textarea.addEventListener('input', () => {
-                const words = countWords(textarea.value);
-                counter.textContent = `${words} / 100 words`;
-
-                if (words > 100) {
-                    counter.classList.remove('valid');
-                    counter.classList.add('invalid');
-                    document.getElementById('submit-btn').disabled = true;
-                } else {
-                    counter.classList.remove('invalid');
-                    counter.classList.add('valid');
-                    document.getElementById('submit-btn').disabled = false;
-                }
-            });
-
-            // Setup emoji picker
-            const emojis = ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','🙃','😉','😊','😇','❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❣️','💕','👍','👎','👌','✌️','🤞','🤟','🤘','🤙','👏','🙌','👐','⭐','✨','💫','🌟','⚡','💥','💯','✅','❌','❓','❗','🎉','🎊','🎈','🎁','🏆'];
-
-            const picker = document.getElementById('emoji-picker');
-            picker.className = 'emoji-picker hidden';
-            emojis.forEach(emoji => {
-                const btn = document.createElement('button');
-                btn.className = 'emoji-btn';
-                btn.textContent = emoji;
-                btn.type = 'button';
-                btn.onclick = () => {
-                    textarea.value += emoji;
-                    textarea.focus();
-                };
-                picker.appendChild(btn);
-            });
-        }
-
-        function toggleEmojis() {
-            const picker = document.getElementById('emoji-picker');
-            picker.classList.toggle('hidden');
-        }
-
-        async function submitMessage() {
-            const session = state.currentSession;
-            const sessionId = session.id;
-            const messageText = document.getElementById('message-text').value.trim();
-
-            if (!messageText) {
-                alert('Please write a message!');
-                return;
-            }
-
-            const wordCount = countWords(messageText);
-            if (wordCount > 100) {
-                alert('Message exceeds 100 words!');
-                return;
-            }
-
-            let studentName = document.getElementById('student-name').value.trim();
-            const isAnonymous = document.getElementById('anonymous-check').checked;
-
-            if (isAnonymous) {
-                studentName = null;
-            }
-
-            let selectedOption = null;
-            if (session.mode === 'question') {
-                const optionEl = document.querySelector('input[name="option"]:checked');
-                if (!optionEl) {
-                    alert('Please select an option (A or B)!');
-                    return;
-                }
-                selectedOption = optionEl.value;
-            }
-
-            const messageData = {
-                id: 'msg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-                session_id: sessionId,
-                participant_id: state.currentUser,
-                student_name: studentName,
-                is_anonymous: isAnonymous,
-                selected_option: selectedOption,
-                message_text: messageText,
-                word_count: wordCount,
-                bottle_color: generateBottleColor()
-            };
-
-            const { data, error } = await supabase
-                .from('messages')
-                .insert([messageData]);
-
-            if (error) {
-                document.getElementById('compose-status').innerHTML = `
-                    <div class="error-message">Error sending message: ${error.message}</div>
-                `;
-                return;
-            }
-
-            // Show success
-            document.getElementById('compose-status').innerHTML = `
-                <div class="success-message">
-                    🎉 Your message has been thrown into the ocean!
-                </div>
-            `;
-
-            // Disable form
-            document.getElementById('submit-btn').disabled = true;
-            document.getElementById('message-text').disabled = true;
-        }
-
-        // ==========================================
-        // INITIALIZE APP
-        // ==========================================
-        window.addEventListener('load', () => {
-            // Check if hash exists
-            const hash = window.location.hash.substring(1);
-            if (hash) {
-                router.navigate(hash);
-            }
-        });
-
-        // Handle back button
-        window.addEventListener('hashchange', () => {
-            const hash = window.location.hash.substring(1);
-            if (hash) {
-                router.navigate(hash);
-            }
-        });
+                <p style="margin: 0;">${msg.message_text}</p>
+              </div>
+              ${!msg.is_read ? `
+                <button class="btn btn-primary" onclick="markAsRead('${msg.id}', '${sessionId}')">✅ Mark Read</button>
+              ` : '<span style="color: var(--success);">✓ Read</span>'}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+      
+      <div style="margin-top: 24px; display: flex; gap: 16px; justify-content: center;">
+        <button class="btn btn-secondary" onclick="location.hash='#/teacher/dashboard'">🏠 Dashboard</button>
+        <button class="btn btn-primary" onclick="exportMessages('${sessionId}')">📥 Export CSV</button>
+      </div>
+    </div>
+  `;
+}
+
+window.markAsRead = async function(messageId, sessionId) {
+  const success = await markMessageAsRead(messageId);
+  if (success) {
+    showToast('Marked as read', 'success');
+    renderReview(sessionId);
+  }
+};
+
+window.exportMessages = async function(sessionId) {
+  const stats = await getSessionStats(sessionId);
+  if (stats.messages.length === 0) {
+    showToast('No messages to export', 'warning');
+    return;
+  }
+  
+  let csv = 'Timestamp,Name,Anonymous,Option,Message,Words\n';
+  stats.messages.forEach(msg => {
+    const timestamp = new Date(msg.created_at).toISOString();
+    const name = msg.is_anonymous ? 'Anonymous' : (msg.student_name || 'Unknown');
+    const anonymous = msg.is_anonymous ? 'Yes' : 'No';
+    const option = msg.selected_option || 'N/A';
+    const message = '"' + msg.message_text.replace(/"/g, '""') + '"';
+    csv += `${timestamp},${name},${anonymous},${option},${message},${msg.word_count}\n`;
+  });
+  
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `session-${sessionId}-messages.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  
+  showToast('Messages exported', 'success');
+};
+
+// Student Views
+function renderStudentJoin() {
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="header">
+      <h1>🎓 Join Session</h1>
+    </div>
+    <div class="container" style="max-width: 500px;">
+      <div class="card">
+        <h2 style="text-align: center; margin-bottom: 24px;">Enter Session Code</h2>
+        <form onsubmit="handleJoinSession(event)">
+          <div class="form-group">
+            <input type="text" class="form-control code-input" id="session-code" placeholder="ABC12345" maxlength="8" required autocomplete="off">
+          </div>
+          <button type="submit" class="btn btn-primary btn-full btn-large">Join Session</button>
+        </form>
+      </div>
+    </div>
+  `;
+  
+  setTimeout(() => {
+    const input = document.getElementById('session-code');
+    if (input) {
+      input.addEventListener('input', (e) => {
+        e.target.value = e.target.value.toUpperCase();
+      });
+    }
+  }, 100);
+}
+
+window.handleJoinSession = async function(event) {
+  event.preventDefault();
+  const code = document.getElementById('session-code')?.value.trim().toUpperCase();
+  
+  if (!code) {
+    showToast('Please enter a code', 'error');
+    return;
+  }
+  
+  const session = await getSession(code);
+  if (!session) {
+    showToast('Session not found', 'error');
+    return;
+  }
+  
+  location.hash = `#/join/${code}`;
+};
+
+async function renderStudentLanding(sessionId) {
+  const session = await getSession(sessionId);
+  
+  if (!session) {
+    showToast('Session not found', 'error');
+    setTimeout(() => location.hash = '#/join', 2000);
+    return;
+  }
+  
+  if (!session.is_active) {
+    showToast('Session has ended', 'warning');
+    setTimeout(() => location.hash = '#/join', 2000);
+    return;
+  }
+  
+  // Join session
+  const participantId = await joinSession(sessionId);
+  if (!participantId) {
+    showToast('Failed to join session', 'error');
+    return;
+  }
+  
+  const stats = await getSessionStats(sessionId);
+  
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="header">
+      <h1>✨ Welcome!</h1>
+    </div>
+    <div class="container" style="max-width: 600px;">
+      <div class="card" style="text-align: center;">
+        <div class="mode-badge ${session.mode === 'free' ? 'mode-free' : 'mode-question'}">
+          ${session.mode === 'free' ? '✍️ Free Mind Mode' : '❓ A/B Question Mode'}
+        </div>
+        <h2 style="margin: 24px 0;">${session.question || 'Share Your Thoughts'}</h2>
+        <p style="font-size: 18px; opacity: 0.7; margin-bottom: 32px;">
+          👥 ${stats.participantCount} students participating
+        </p>
+        <button class="btn btn-primary btn-large btn-full" onclick="location.hash='#/student/compose/${sessionId}'">🚀 Start Writing</button>
+      </div>
+    </div>
+  `;
+}
+
+async function renderComposer(sessionId) {
+  const session = await getSession(sessionId);
+  
+  if (!session || !session.is_active) {
+    showToast('Session not available', 'error');
+    setTimeout(() => location.hash = '#/join', 2000);
+    return;
+  }
+  
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="header">
+      <h1>✍️ Compose Message</h1>
+    </div>
+    <div class="container" style="max-width: 700px;">
+      <div class="card">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <div class="mode-badge ${session.mode === 'free' ? 'mode-free' : 'mode-question'}">
+            ${session.mode === 'free' ? '✍️ Free Mind' : '❓ Question'}
+          </div>
+        </div>
+        
+        ${session.mode === 'question' ? `
+          <div class="question-box">
+            <h3>${session.question}</h3>
+            <div class="options">
+              <div class="option-card" onclick="selectOption('A')" id="option-A">
+                <h4>Option A</h4>
+                <p>${session.option_a}</p>
+              </div>
+              <div class="option-card" onclick="selectOption('B')" id="option-B">
+                <h4>Option B</h4>
+                <p>${session.option_b}</p>
+              </div>
+            </div>
+          </div>
+        ` : ''}
+        
+        <form id="message-form" onsubmit="handleSubmitMessage(event, '${sessionId}')">
+          <div class="form-group">
+            <label>Your Message (max 100 words)</label>
+            <textarea class="textarea form-control" id="message-text" placeholder="Share your thoughts..." oninput="updateWordCount()"></textarea>
+            <div class="word-counter valid" id="word-counter">0 / 100 words</div>
+          </div>
+          
+          <div style="margin-bottom: 16px;">
+            <button type="button" class="btn btn-secondary" onclick="toggleEmojiPicker()">😊 Add Emoji</button>
+            <div class="emoji-picker" id="emoji-picker" style="display: none;">
+              <div class="emoji-grid" id="emoji-grid"></div>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label>Your Name (optional)</label>
+            <input type="text" class="form-control" id="student-name" placeholder="Enter your name">
+            <div class="checkbox-group">
+              <input type="checkbox" id="anonymous" onchange="toggleNameField()">
+              <label for="anonymous">Submit anonymously</label>
+            </div>
+          </div>
+          
+          <button type="submit" class="btn btn-primary btn-large btn-full" id="submit-btn">🚀 Send Message</button>
+        </form>
+      </div>
+    </div>
+  `;
+  
+  // Initialize emoji picker
+  setTimeout(() => {
+    const emojis = ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','😉','😊','❤️','🧡','💛','💚','💙','💜','🖤','🤍','👍','👎','👌','✌️','🤞','👏','🙌','⭐','✨','💫','🌟','⚡','💥','💯','✅','🎉','🎊','🎈','🎁','🏆','🥇'];
+    const grid = document.getElementById('emoji-grid');
+    if (grid) {
+      emojis.forEach(emoji => {
+        const item = document.createElement('div');
+        item.className = 'emoji-item';
+        item.textContent = emoji;
+        item.onclick = () => insertEmoji(emoji);
+        grid.appendChild(item);
+      });
+    }
+  }, 100);
+  
+  window.selectedOption = null;
+}
+
+window.selectOption = function(option) {
+  window.selectedOption = option;
+  document.querySelectorAll('.option-card').forEach(card => {
+    card.classList.remove('selected');
+  });
+  const card = document.getElementById(`option-${option}`);
+  if (card) card.classList.add('selected');
+};
+
+window.updateWordCount = function() {
+  const textarea = document.getElementById('message-text');
+  const counter = document.getElementById('word-counter');
+  const submitBtn = document.getElementById('submit-btn');
+  
+  if (!textarea || !counter || !submitBtn) return;
+  
+  const wordCount = countWords(textarea.value);
+  counter.textContent = `${wordCount} / 100 words`;
+  
+  if (wordCount > 100) {
+    counter.className = 'word-counter invalid';
+    submitBtn.disabled = true;
+  } else {
+    counter.className = 'word-counter valid';
+    submitBtn.disabled = false;
+  }
+};
+
+window.toggleNameField = function() {
+  const checkbox = document.getElementById('anonymous');
+  const nameField = document.getElementById('student-name');
+  if (checkbox && nameField) {
+    nameField.disabled = checkbox.checked;
+    if (checkbox.checked) nameField.value = '';
+  }
+};
+
+window.toggleEmojiPicker = function() {
+  const picker = document.getElementById('emoji-picker');
+  if (picker) {
+    picker.style.display = picker.style.display === 'none' ? 'block' : 'none';
+  }
+};
+
+window.insertEmoji = function(emoji) {
+  const textarea = document.getElementById('message-text');
+  if (!textarea) return;
+  
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const text = textarea.value;
+  
+  textarea.value = text.substring(0, start) + emoji + text.substring(end);
+  textarea.selectionStart = textarea.selectionEnd = start + emoji.length;
+  textarea.focus();
+  
+  updateWordCount();
+  toggleEmojiPicker();
+};
+
+window.handleSubmitMessage = async function(event, sessionId) {
+  event.preventDefault();
+  
+  const messageText = document.getElementById('message-text')?.value.trim();
+  const studentName = document.getElementById('student-name')?.value.trim();
+  const isAnonymous = document.getElementById('anonymous')?.checked || false;
+  
+  if (!messageText) {
+    showToast('Please write a message', 'error');
+    return;
+  }
+  
+  const wordCount = countWords(messageText);
+  if (wordCount > 100) {
+    showToast('Message exceeds 100 words', 'error');
+    return;
+  }
+  
+  const session = await getSession(sessionId);
+  if (session && session.mode === 'question' && !window.selectedOption) {
+    showToast('Please select an option', 'error');
+    return;
+  }
+  
+  const message = {
+    messageText,
+    studentName: isAnonymous ? null : studentName,
+    isAnonymous,
+    selectedOption: window.selectedOption || null
+  };
+  
+  const success = await submitMessage(sessionId, message);
+  if (success) {
+    showToast('Message sent! 🎉', 'success');
+    setTimeout(() => {
+      location.hash = `#/student/submitted/${sessionId}`;
+    }, 500);
+  }
+};
+
+async function renderSubmitted(sessionId) {
+  const session = await getSession(sessionId);
+  
+  if (!session) {
+    showToast('Session not found', 'error');
+    setTimeout(() => location.hash = '#/join', 2000);
+    return;
+  }
+  
+  const stats = await getSessionStats(sessionId);
+  
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="header">
+      <h1>✅ Message Sent!</h1>
+    </div>
+    <div class="container" style="max-width: 800px;">
+      <div class="card" style="text-align: center;">
+        <h2>🎉 Your message is floating in the ocean!</h2>
+        <p style="font-size: 18px; opacity: 0.7; margin: 16px 0;">
+          Watch as more bottles appear when other students submit their messages.
+        </p>
+        <p style="font-size: 20px; color: var(--primary); font-weight: 600;" id="message-count">
+          💬 ${stats.messageCount} messages collected
+        </p>
+      </div>
+      
+      <div class="card" style="margin-top: 24px;">
+        <h3 style="text-align: center;">🌊 Ocean View</h3>
+        <div class="ocean-container">
+          <div class="ocean-placeholder" id="ocean-display">
+            ${stats.messageCount} bottle${stats.messageCount !== 1 ? 's' : ''} floating
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  // Subscribe to updates
+  subscribeToSession(sessionId, async () => {
+    const newStats = await getSessionStats(sessionId);
+    updateElement('message-count', `💬 ${newStats.messageCount} messages collected`);
+    updateElement('ocean-display', `${newStats.messageCount} bottle${newStats.messageCount !== 1 ? 's' : ''} floating`);
+  });
+}
+
+// Initialize
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log('App initialized');
+    setupRouter();
+  });
+} else {
+  console.log('App initialized');
+  setupRouter();
+}
     </script>
 </body>
 </html>
